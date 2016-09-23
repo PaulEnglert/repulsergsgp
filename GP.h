@@ -55,6 +55,8 @@ Instance *set;
 int nrow;
 /// variable containing the numbers of columns (excluding the target) of the training dataset
 int nvar;
+/// variable containing the numbers of rows (instances) of the validation dataset (used to identify overfitting)
+int nrow_val;
 /// variable containing the numbers of rows (instances) of the test dataset
 int nrow_test;
 /// variable containing the numbers of columns (excluding the target) of the test dataset
@@ -90,6 +92,8 @@ typedef struct cfg_{
     double max_random_constant;
 /// variable that indicates if the problem is a minimization problem (1) or a maximization problem (0)
     int minimization_problem;
+/// variable that defines the proportion of the validation set in percent of the training set
+    double validation_set_size;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -192,6 +196,8 @@ class population{
 		int num_ind;
 		/// array of training fitness data
 		fitness_data *fitness;
+		/// array of validation fitness data
+		fitness_data *fitness_val;
 		/// array of test fitness data
 		fitness_data *fitness_test;
 		/// class constructor
@@ -199,6 +205,7 @@ class population{
 			individuals=new node* [config.population_size]; 
 			num_ind=0;
 			fitness=new fitness_data [config.population_size];
+			fitness_val=new fitness_data [config.population_size];
 			fitness_test=new fitness_data [config.population_size];
 		};
 		/// class destructor
@@ -207,10 +214,14 @@ class population{
 
 /// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the training set at generation g
 fitness_list fit_;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the validation set at generation g
+fitness_list fit_val;
 /// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the test set at generation g
 fitness_list fit_test;
 /// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the training set at generation g+1
 fitness_list fit_new;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the validation set at generation g+1
+fitness_list fit_new_val;
 /// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the test set at generation g+1
 fitness_list fit_new_test;
 
@@ -218,6 +229,10 @@ fitness_list fit_new_test;
 vector < vector<double> > sem_train_cases;
 /// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the training set at generation g+1
 vector < vector<double> > sem_train_cases_new;
+/// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the validation set at generation g
+vector < vector<double> > sem_val_cases;
+/// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the validation set at generation g+1
+vector < vector<double> > sem_val_cases_new;
 /// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the test set at generation g
 vector < vector<double> > sem_test_cases;
 /// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the test set at generation g+1
@@ -225,6 +240,8 @@ vector < vector<double> > sem_test_cases_new;
 
 /// array where each element (that is also an array) contains the semantics of a repulsor individual
 vector < vector<double> > sem_repulsors;
+/// array where each element (that is also an array) contains the semantics of a repulsor individual that will be additionally checked in the next generations
+vector < vector<double> > sem_repulsors_new;
 /// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g
 vector < vector<double> > repulsor_distances;
 /// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g+1
@@ -400,6 +417,17 @@ void evaluate(population **p);
 */
 double Myevaluate(node *el);
 
+/*!
+* \fn                 double Myevaluate_val(node *el)
+* \brief             function that calculates the validation fitness of an individual (representing as a tree)
+* \param          node *el: radix of the tree
+* \return           double: the validation fitness of the individual
+* \date             01/09/2012
+* \author          Mauro Castelli
+* \file               GP.h
+*/
+double Myevaluate_val(node *el);
+
 
 /*!
 * \fn                 double Myevaluate_test(node *el)
@@ -424,6 +452,18 @@ double Myevaluate_test(node *el);
 * \file              GP.h
 */
 void Myevaluate_random (node *el, vector <double> & sem);
+
+/*!
+* \fn                void Myevaluate_random_val (node *el, vector <double> & sem)
+* \brief             function that calculates the semantics (considering validation instances) of a randomly generated tree. The tree is used to perform the semantic geometric crossover or the geometric semantic mutation
+* \param          node* el: radix of the tree to be evaluated
+* \param          vector <double> & sem: reference to an empty vector that, at the end of the function, will contain the semantics of the individual calculated on the validation instances
+* \return           void 
+* \date             TODO add date
+* \author          Paul Englert
+* \file              GP.h
+*/
+void Myevaluate_random_val (node *el, vector <double> & sem);
 
 
 /*!
@@ -531,6 +571,20 @@ void geometric_semantic_mutation(int i);
 * \file               GP.h
 */
 void update_training_fitness(vector <double> semantic_values, bool crossover);
+
+
+
+/*!
+* \fn                void update_validation_fitness(vector <double> semantic_values, bool crossover)
+* \brief             function that calculate the validation fitness of an individual using the information stored in its semantic vector. The function updates the data structure that stores the validation fitness of the individuals
+* \param            vector <double> semantic_values: vector that contains the semantics (calculated on the validation set) of an individual
+* \param            bool crossover: variable that indicates if the function has been called by the geometric semantic crossover or by the geometric semantic mutation
+* \return           void
+* \date             01/09/2012
+* \author          Mauro Castelli
+* \file               GP.h
+*/
+void update_validation_fitness(vector <double> semantic_values, bool crossover);
 
 
 /*!
@@ -680,11 +734,17 @@ void read_config_file(cfg *config){
 			config->max_random_constant=atof(str2);
 		if(k==12)
 			config->minimization_problem=atoi(str2);
+		if(k==13)
+			config->validation_set_size=atof(str2);
         k++;        
 	}	
     f.close();
     if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
         cout<<"ERROR: CROSSOVER RATE AND MUTATION RATE MUST BE GREATER THAN (OR EQUAL TO) 0 AND THEIR SUM SMALLER THAN (OR EQUAL TO) 1.";
+        exit(-1);
+    }
+    if(config->validation_set_size<0 || config->validation_set_size>=1){
+        cout<<"ERROR: VALIDATION SET SIZE CANNOT BE SMALLER THAN 0 OR EQUAL (OR LARGER) TO 1.";
         exit(-1);
     }
 }
@@ -915,16 +975,20 @@ double eval(node *tree){
 
 void evaluate(population **p){
 		(*p)->fitness[0]=make_tuple(Myevaluate((*p)->individuals[0]), 0, 0);
+		(*p)->fitness_val[0]=make_tuple(Myevaluate_val((*p)->individuals[0]), 0, 0);
 		(*p)->fitness_test[0]=make_tuple(Myevaluate_test((*p)->individuals[0]), 0, 0);
 		(*p)->index_best=0;
 		fit_.push_back((*p)->fitness[0]);
+		fit_val.push_back((*p)->fitness_val[0]);
 		fit_test.push_back((*p)->fitness_test[0]);
     	for(int i=1; i<config.population_size; i++){
     		(*p)->fitness[i]=make_tuple(Myevaluate((*p)->individuals[i]), 0, 0);
+    		(*p)->fitness_val[i]=make_tuple(Myevaluate_val((*p)->individuals[i]), 0, 0);
     		(*p)->fitness_test[i]=make_tuple(Myevaluate_test((*p)->individuals[i]), 0, 0);
     		fit_.push_back((*p)->fitness[i]);
+	       	fit_val.push_back((*p)->fitness_val[i]);
 	       	fit_test.push_back((*p)->fitness_test[i]);
-            // TODO add calculation to semantic repulsors if they exist
+
             if(better(get<0>((*p)->fitness[i]),get<0>((*p)->fitness[(*p)->index_best]))){
                 (*p)->index_best=i;
             }
@@ -947,11 +1011,25 @@ double Myevaluate (node *el) {
     return d;
 }
 
+double Myevaluate_val (node *el) {
+	double d=0;
+    vector <double> val;
+    for(int i=nrow;i<nrow+nrow_val;i++){
+       update_terminal_symbols(i);
+       set[i].res=eval(el);
+       val.push_back(set[i].res);
+       d+=(set[i].res-set[i].y_value)*(set[i].res-set[i].y_value);
+    }
+    sem_val_cases.push_back(val);
+    d=sqrt(d/nrow_val);
+    return d;
+}
+
 
 double Myevaluate_test (node *el) {
 	double d=0;
     vector <double> val;
-    for(int i=nrow;i<nrow+nrow_test;i++){
+    for(int i=nrow+nrow_val;i<nrow+nrow_val+nrow_test;i++){
         update_terminal_symbols(i);
         set[i].res=eval(el);
         val.push_back(set[i].res);
@@ -971,8 +1049,16 @@ void Myevaluate_random (node *el, vector <double> & sem){
     }
 }
 
+void Myevaluate_random_val (node *el, vector <double> & sem){
+    for(int i=nrow;i<nrow+nrow_val;i++){
+	       update_terminal_symbols(i);
+	       set[i].res=eval(el);
+           sem.push_back(set[i].res);
+    }
+}
+
 void Myevaluate_random_test(node *el, vector <double> & sem) {
-    for(int i=nrow;i<nrow+nrow_test;i++){
+    for(int i=nrow+nrow_val;i<nrow+nrow_val+nrow_test;i++){
         update_terminal_symbols(i);
         set[i].res=eval(el);
         sem.push_back(set[i].res);
@@ -1131,24 +1217,21 @@ int tournament_selection(){
 
 
 void reproduction(int i){
+	int p1 = i;
     if(i!=index_best){
-        int p1=tournament_selection();
-        sem_train_cases_new.push_back(sem_train_cases[p1]);
-        fit_new.push_back(fit_[p1]);
-        if (sem_repulsors.size()>0) 
-        	repulsor_distances_new.push_back(repulsor_distances[p1]);
-        sem_test_cases_new.push_back(sem_test_cases[p1]);
-        fit_new_test.push_back(fit_test[p1]);
+        p1=tournament_selection();
     }
-    else{
-        sem_train_cases_new.push_back(sem_train_cases[i]);
-        fit_new.push_back(fit_[i]);
-        if (sem_repulsors.size()>0) 
-        	repulsor_distances_new.push_back(repulsor_distances[i]);
-        sem_test_cases_new.push_back(sem_test_cases[i]);
-        fit_new_test.push_back(fit_test[i]);
-    }
-    // cout<<"Variation: applied reproduction"<<endl;
+    // train
+    sem_train_cases_new.push_back(sem_train_cases[p1]);
+    fit_new.push_back(fit_[p1]);
+    if (sem_repulsors.size()>0) 
+    	repulsor_distances_new.push_back(repulsor_distances[p1]);
+   	// validation
+    sem_val_cases_new.push_back(sem_val_cases[p1]);
+    fit_new_val.push_back(fit_val[p1]);
+    // test
+    sem_test_cases_new.push_back(sem_test_cases[p1]);
+    fit_new_test.push_back(fit_test[p1]);
 }
 
 
@@ -1161,14 +1244,17 @@ void geometric_semantic_crossover(int i){
         create_grow_tree((node**)&(RT),0, NULL, config.max_depth_creation);
         
         vector <double> sem_RT;
+        vector <double> sem_RT_val;
         vector <double> sem_RT_test;
 
         Myevaluate_random(RT, sem_RT);
+        Myevaluate_random_val(RT, sem_RT_val);
         Myevaluate_random_test(RT, sem_RT_test);
         
         delete_individual(RT);
 
         vector <double> val;
+        vector <double> val_val;
         vector <double> val_test;
         for(int j=0;j<nrow;j++){
             double sigmoid=1.0/(1+exp(-(sem_RT[j])));
@@ -1178,6 +1264,15 @@ void geometric_semantic_crossover(int i){
         update_training_fitness(val,1);
         update_repulsor_distances(val,1);
 
+        // validation
+        for(int j=0;j<nrow_val;j++){
+            double sigmoid_val=1.0/(1+exp(-(sem_RT_val[j])));
+	        val_val.push_back(sem_val_cases[p1][j]*(sigmoid_val)+sem_val_cases[p2][j]*(1-sigmoid_val));
+        }
+        sem_val_cases_new.push_back(val_val);
+        update_validation_fitness(val_val,1);
+
+        // test
         for(int j=0;j<nrow_test;j++){
             double sigmoid_test=1.0/(1+exp(-(sem_RT_test[j])));
 	        val_test.push_back(sem_test_cases[p1][j]*(sigmoid_test)+sem_test_cases[p2][j]*(1-sigmoid_test));
@@ -1187,14 +1282,18 @@ void geometric_semantic_crossover(int i){
     }
 
     else{
+    	// train
         sem_train_cases_new.push_back(sem_train_cases[i]);
         fit_new.push_back(fit_[i]);
         if (sem_repulsors.size()>0) 
         	repulsor_distances_new.push_back(repulsor_distances[i]);
+        // validation
+        sem_val_cases_new.push_back(sem_val_cases[i]);
+        fit_new_val.push_back(fit_val[i]);
+        // test
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    // cout<<"Variation: applied crossover"<<endl;
 }
 
 void geometric_semantic_mutation(int i){
@@ -1205,13 +1304,17 @@ void geometric_semantic_mutation(int i){
         create_grow_tree((node**)&(RT_2),0, NULL, config.max_depth_creation);
         
         vector <double> sem_RT1;
+        vector <double> sem_RT1_val;
         vector <double> sem_RT1_test;
         vector <double> sem_RT2;
+        vector <double> sem_RT2_val;
         vector <double> sem_RT2_test;
         
         Myevaluate_random(RT,sem_RT1);
+        Myevaluate_random_val(RT,sem_RT1_val);
         Myevaluate_random_test(RT,sem_RT1_test);
         Myevaluate_random(RT_2,sem_RT2);
+        Myevaluate_random_val(RT_2,sem_RT2_val);
         Myevaluate_random_test(RT_2,sem_RT2_test);
         delete_individual(RT);
         delete_individual(RT_2);
@@ -1225,6 +1328,15 @@ void geometric_semantic_mutation(int i){
         update_training_fitness(sem_train_cases_new[i],0);
         update_repulsor_distances(sem_train_cases_new[i],0);
 
+        // validation
+        for(int j=0;j<nrow_val;j++){
+    	    double sigmoid_val_1=1.0/(1+exp(-(sem_RT1_val[j])));
+    	    double sigmoid_val_2=1.0/(1+exp(-(sem_RT2_val[j])));
+            sem_val_cases_new[i][j]=sem_val_cases_new[i][j]+config.mutation_step*(sigmoid_val_1-sigmoid_val_2);
+        }
+        update_validation_fitness(sem_val_cases_new[i],0);
+
+        // test
         for(int j=0;j<nrow_test;j++){
     	    double sigmoid_test_1=1.0/(1+exp(-(sem_RT1_test[j])));
     	    double sigmoid_test_2=1.0/(1+exp(-(sem_RT2_test[j])));
@@ -1233,14 +1345,18 @@ void geometric_semantic_mutation(int i){
         update_test_fitness(sem_test_cases_new[i],0);
     }
     else{
+    	// train
         sem_train_cases_new.push_back(sem_train_cases[i]);
         fit_new.push_back(fit_[i]);
         if (sem_repulsors.size()>0) 
         	repulsor_distances_new.push_back(repulsor_distances[i]);
+        // validation
+        sem_val_cases_new.push_back(sem_val_cases[i]);
+        fit_new_val.push_back(fit_val[i]);
+        // test
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    // cout<<"Variation: applied mutation"<<endl;
 }
 
 
@@ -1256,11 +1372,22 @@ void update_training_fitness(vector <double> semantic_values, bool crossover){
         fit_new[fit_new.size()-1]=make_tuple(sqrt(d/nrow), 0, 0);
 }
 
+void update_validation_fitness(vector <double> semantic_values, bool crossover){
+    double d=0;
+    for(int j=nrow;j<nrow+nrow_val;j++){
+        d+=(semantic_values[j-nrow]-set[j].y_value)*(semantic_values[j-nrow]-set[j].y_value);
+    }
+    if(crossover==1)
+        fit_new_val.push_back(make_tuple(sqrt(d/nrow_val), 0, 0));
+    else    
+        fit_new_val[fit_new_val.size()-1]=make_tuple(sqrt(d/nrow_val), 0, 0);
+}
+
 
 void update_test_fitness(vector <double> semantic_values, bool crossover){
     double d=0;
-    for(int j=nrow;j<nrow+nrow_test;j++){
-        d+=(semantic_values[j-nrow]-set[j].y_value)*(semantic_values[j-nrow]-set[j].y_value);
+    for(int j=nrow+nrow_val;j<nrow+nrow_val+nrow_test;j++){
+        d+=(semantic_values[j-nrow-nrow_val]-set[j].y_value)*(semantic_values[j-nrow-nrow_val]-set[j].y_value);
     }
     if(crossover == 1)
         fit_new_test.push_back(make_tuple(sqrt(d/nrow_test), 0, 0));
@@ -1302,6 +1429,7 @@ int best_individual(){
 
 
 void update_tables(){
+	// training set
     fit_.clear();
    	fit_.assign(fit_new.begin(),fit_new.end());
    	fit_new.clear();
@@ -1316,6 +1444,14 @@ void update_tables(){
 	    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
 	    repulsor_distances_new.clear();
 	}
+	// validation set
+   	fit_val.clear();
+   	fit_val.assign(fit_new_val.begin(),fit_new_val.end());
+   	fit_new_val.clear();
+   	sem_val_cases.clear();
+   	sem_val_cases.assign(sem_val_cases_new.begin(),sem_val_cases_new.end());
+   	sem_val_cases_new.clear();
+   	// test set
    	fit_test.clear();
    	fit_test.assign(fit_new_test.begin(),fit_new_test.end());
    	fit_new_test.clear();
@@ -1366,6 +1502,10 @@ void read_input_data(char *train_file, char *test_file){
        	set[i].y_value = atof(str);
 	}
 	in_test.close();
+
+	cout<<"Splitting train set; validation set proportion = "<<config.validation_set_size<<endl;
+	nrow_val = floor(config.validation_set_size*nrow);
+	nrow = nrow-nrow_val;
 }
 
 bool better (double f1, double f2){

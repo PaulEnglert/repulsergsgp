@@ -54,6 +54,10 @@ int main(int argc, const char **argv){
     */
     ofstream fitness_train("fitnesstrain.txt",ios::out);
     /*
+    pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
+    */
+    ofstream fitness_val("fitnessvalidation.txt",ios::out);
+    /*
     pointer to the file fitnesstest.txt containing the training fitness of the best individual at each generation
     */
     ofstream fitness_test("fitnesstest.txt",ios::out);
@@ -74,7 +78,9 @@ int main(int argc, const char **argv){
     evaluate((population**)&p);
     // writing the  training fitness of the best individual on the file fitnesstrain.txt
     fitness_train<<Myevaluate(p->individuals[p->index_best])<<endl;
-	// writing the  test fitness of the best individual on the file fitnesstest.txt
+    // writing the validation fitness of the best individual on the file fitnesstest.txt
+    fitness_val<<Myevaluate_val(p->individuals[p->index_best])<<endl;
+	// writing the test fitness of the best individual on the file fitnesstest.txt
     fitness_test<<Myevaluate_test(p->individuals[p->index_best])<<endl;
 	// index of the best individual stored in the variable best_index
     index_best=best_individual();
@@ -110,6 +116,8 @@ int main(int argc, const char **argv){
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
         fitness_train<<"fitness: "<<get<0>(fit_[index_best])<<" front-level: "<<get<1>(fit_[index_best])<<" CD: "<<get<2>(fit_[index_best])<<endl;
+        // writing the  validation fitness of the best individual on the file fitnesstest.txt
+        fitness_val<<get<0>(fit_val[index_best])<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt
         fitness_test<<get<0>(fit_test[index_best])<<endl;
     }    
