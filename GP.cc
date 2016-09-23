@@ -98,7 +98,8 @@ int main(int argc, const char **argv){
                 reproduction(k);
             }
         }
-        
+        // update non-domination rank and crowded distance measure
+        nsga_II_sort((population**)&p);
         // updating the tables used to store semantics and fitness values
 		update_tables();
 		// index of the best individual stored in the variable best_index

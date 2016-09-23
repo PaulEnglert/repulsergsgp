@@ -430,6 +430,18 @@ void Myevaluate_random (node *el, vector <double> & sem);
 */
 void Myevaluate_random_test(node *el, vector <double> & sem);
 
+/*!
+* \fn                 void nsga_II_sort(population **p)
+* \brief             function that assigns a non-domination rank and a crowded distance measure to the individuals fitness data of a population
+* \param          population **p: pointer to the population containing the individuals
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file              GP.h
+*/
+void nsga_II_sort(population **p);
+
+
 
 /*!
 * \fn                void update_terminal_symbols(int i)
@@ -874,10 +886,8 @@ void evaluate(population **p){
             if(better(get<0>((*p)->fitness[i]),get<0>((*p)->fitness[(*p)->index_best]))){
                 (*p)->index_best=i;
             }
-            // if(better((*p)->fitness[i],(*p)->fitness[(*p)->index_best])){
-            //     (*p)->index_best=i;
-            // }
         }
+        nsga_II_sort(p);
 }
 
 
@@ -925,6 +935,24 @@ void Myevaluate_random_test(node *el, vector <double> & sem) {
         set[i].res=eval(el);
         sem.push_back(set[i].res);
     }
+}
+
+void nsga_II_sort(population **p) {
+	cout<<"Updating nondominated rank and crowded distance measure\n";
+
+	// for all individuals in p, calculate domination count and set fo dominated solutions
+	double *domination_counts = new double [config.population_size];
+	vector< vector<int> > dominated_individuals;
+	cout<<"Calculating domination count and set of dominated individuals for each individual in p\n";
+	for(int i=0; i<config.population_size; i++){
+		vector<int> d_inds;
+		for(int j=0; j<config.population_size; j++){
+			if (i == j) continue; // no need to compare to oneself
+			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
+		}	
+	}
+	// calculate crowded distance measure to be used in combination with rank as ftness during next selection and variation phase
+	cout<<"Calculating crowded distance for each individual in p\n";
 }
 
 
@@ -981,6 +1009,7 @@ void reproduction(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
+    cout<<"Variation: applied reproduction\n";
 }
 
 
@@ -1023,6 +1052,7 @@ void geometric_semantic_crossover(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
+    cout<<"Variation: applied crossover\n";
 }
 
 void geometric_semantic_mutation(int i){
@@ -1065,6 +1095,7 @@ void geometric_semantic_mutation(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
+    cout<<"Variation: applied mutation\n";
 }
 
 
