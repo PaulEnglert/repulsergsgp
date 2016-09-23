@@ -25,6 +25,7 @@
 #include <cstring>
 #include <vector>
 #include <tuple>
+#include <limits>
 #include <time.h>
 /// Macro used to generate a random number
 #define frand() ((double) rand() / (RAND_MAX))
@@ -1023,6 +1024,7 @@ void nsga_II_sort(population **p) {
 		cout<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
 		vector <int> next_front;
 		for (int i = 0; i < domination_front.size(); i++){
+			// extract next front and update ranks
 			for (int d = 0; d < dominated_individuals[domination_front[i]].size(); d++){
 				int q = dominated_individuals[domination_front[i]][d];
 				if (find(next_front.begin(), next_front.end(), q) == next_front.end()) { // check if the index has been worked already
@@ -1032,11 +1034,54 @@ void nsga_II_sort(population **p) {
 				}
 			}
 		}
+		cout<<"Calculating crowded distance for each individual in front "<<front<<endl;
+		// estimate the average cuboid around an individual formed by the nearest neihbours
+		// QUESTION: should this also include the fitness, or just the distances to a repulsor? I'd say yes...
+		for (int o = 0; o <= sem_repulsors.size(); o++){ 
+			// gather values from the objective and add into ascendingly sorted vector front_values
+			vector< tuple<int, double> > front_values;
+			for (int i = 0; i < domination_front.size(); i++){
+				tuple<int, double> value;
+				if (o == sem_repulsors.size()){
+					// use fitness as objective
+					value = make_tuple(domination_front[i], get<0>(fit_new[i]));
+				} else {
+					// use distance to repulsor objective o
+					value = make_tuple(domination_front[i], repulsor_distances_new[i][o]);
+				}
+				auto it = lower_bound(front_values.begin(), front_values.end(), value,
+                          [](tuple<int, double> const &t1, tuple<int, double> const &t2)
+                          { return get<1>(t1) < get<1>(t2); });
+				front_values.insert(it, value);
+			}
+
+			// print out vector to check sorting
+			// cout<<"sorted vector of values of front "<<front<<" corresponding to objective "<<o<<" (max "<<sem_repulsors.size()<<"):"<<endl;
+			// for (int i = 0; i < front_values.size(); i++){
+			// 	cout<<"("<<get<0>(front_values[i])<<","<<get<1>(front_values[i])<<"),";
+			// }
+			// cout<<endl;
+
+			// set distance of first and last element to infinite
+			int q = get<0>(front_values[0]);
+			fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+			(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+			q = get<0>(front_values[front_values.size()-1]);
+			fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+			(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+			for (int q = 1; q < front_values.size()-1; q++){
+				// cout<<"calculating cd: "<<get<2>(fit_new[q])<<"+"<<get<1>(front_values[q+1])<<"-"<<get<1>(front_values[q-1])<<"/"<<get<1>(front_values[front_values.size()-1])<<"-"<<get<1>(front_values[0])<<endl;
+				double dist = get<2>(fit_new[q]) + (get<1>(front_values[q+1])-get<1>(front_values[q-1]))/(get<1>(front_values[front_values.size()-1])-get<1>(front_values[0]));
+				fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
+				(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
+			}
+
+		}
+
+		// update iteration data
 		front++;
 		domination_front = next_front;
-	} 
-	// calculate crowded distance measure to be used in combination with rank as fitness during next selection and variation phase
-	cout<<"Calculating crowded distance for each individual in p"<<endl;
+	}
 }
 
 
@@ -1227,7 +1272,7 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
     for (int r=0; r < sem_repulsors.size(); r++){
     	d = 0;
     	for (int v=0; v < semantic_values.size(); v++){
-    		d += pow( sem_repulsors[r][v] - semantic_values[v], 2);
+    		d += (sem_repulsors[r][v] - semantic_values[v])*(sem_repulsors[r][v] - semantic_values[v]);
     	}
     	rds.push_back(sqrt(d));
     }
@@ -1342,7 +1387,7 @@ void add_semantic_repulsor(vector <double> semantic_values){
 	    for (int r=0; r < sem_repulsors.size(); r++){
 	    	d = 0;
 	    	for (int v=0; v < semantic_values.size(); v++){
-	    		d += pow( sem_repulsors[r][v] - semantic_values[v], 2);
+	    		d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
 	    	}
 	    	rds.push_back(sqrt(d));
 	    }

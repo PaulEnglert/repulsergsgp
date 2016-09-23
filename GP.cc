@@ -109,7 +109,7 @@ int main(int argc, const char **argv){
 		// index of the best individual stored in the variable best_index
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
-        fitness_train<<get<0>(fit_[index_best])<<endl;
+        fitness_train<<"fitness: "<<get<0>(fit_[index_best])<<" front-level: "<<get<1>(fit_[index_best])<<" CD: "<<get<2>(fit_[index_best])<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt
         fitness_test<<get<0>(fit_test[index_best])<<endl;
     }    
