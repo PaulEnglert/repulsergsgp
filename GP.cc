@@ -78,6 +78,10 @@ int main(int argc, const char **argv){
     fitness_test<<Myevaluate_test(p->individuals[p->index_best])<<endl;
 	// index of the best individual stored in the variable best_index
     index_best=best_individual();
+
+    // add fake repulsors for testing
+    create_fake_repulsors(3);
+
 	// main GP cycle
 	for(int num_gen=0; num_gen<config.max_number_generations; num_gen++){	
         

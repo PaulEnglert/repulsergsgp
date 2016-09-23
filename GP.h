@@ -222,6 +222,13 @@ vector < vector<double> > sem_test_cases;
 /// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the test set at generation g+1
 vector < vector<double> > sem_test_cases_new;
 
+/// array where each element (that is also an array) contains the semantics of a repulsor individual
+vector < vector<double> > sem_repulsors;
+/// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g
+vector < vector<double> > repulsor_distances;
+/// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g+1
+vector < vector<double> > repulsor_distances_new;
+
 /// variable that stores the index of the best individual.  
 int index_best;
 
@@ -539,6 +546,18 @@ void update_test_fitness(vector <double> semantic_values, bool crossover);
 
 
 /*!
+* \fn                void update_repulsor_distances(vector <double> semantic_values, bool crossover)
+* \brief             function that calculates the semantic distance of an indivdual for all existing repulsors. The function updates the structure that stores the distances of each individual to each repulsor
+* \param            vector <double> semantic_values: vector that contains the semantics (calculated on the training set) of an individual
+* \param            bool crossover: variable that indicates if the function has been called by the geometric semantic crossover or by the geometric semantic mutation
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file               GP.h
+*/
+void update_repulsor_distances(vector <double> semantic_values, bool crossover);
+
+/*!
 * \fn                int best_individual()
 * \brief             function that finds the best individual in the population
 * \return           int: the index of the best individual
@@ -582,6 +601,28 @@ void read_input_data(char *train_file, char *test_file);
 * \file             GP.h
 */
 bool better (double f1, double f2);
+
+/*!
+* \fn               void add_semantic_repulsor(vector <double> semantic_values)
+* \brief            function that adds the given semantics to the repulsor structure
+* \param            vector <double> semantic_values: semantics of the repulsor to add
+* \return           void
+* \date             TODO add date
+* \author           Paul Englert
+* \file             GP.h
+*/
+void add_semantic_repulsor(vector <double> semantic_values);
+
+/*!
+* \fn               void create_fake_repulors(int num_repulsors)
+* \brief            function that randomly creates semantic repulsors for testing purposes
+* \param            int num_repulsors: number of repulsors to create
+* \return           void
+* \date             TODO add date
+* \author           Paul Englert
+* \file             GP.h
+*/
+void create_fake_repulsors(int num_repulsors);
 
 void read_config_file(cfg *config){
 	fstream f("configuration.ini", ios::in);
@@ -882,7 +923,7 @@ void evaluate(population **p){
     		(*p)->fitness_test[i]=make_tuple(Myevaluate_test((*p)->individuals[i]), 0, 0);
     		fit_.push_back((*p)->fitness[i]);
 	       	fit_test.push_back((*p)->fitness_test[i]);
-            
+            // TODO add calculation to semantic repulsors if they exist
             if(better(get<0>((*p)->fitness[i]),get<0>((*p)->fitness[(*p)->index_best]))){
                 (*p)->index_best=i;
             }
@@ -895,10 +936,10 @@ double Myevaluate (node *el) {
 	double d=0;
     vector <double> val;
     for(int i=0;i<nrow;i++){
-	       update_terminal_symbols(i);
-	       set[i].res=eval(el);
-	       val.push_back(set[i].res);
-	       d+=(set[i].res-set[i].y_value)*(set[i].res-set[i].y_value);
+       update_terminal_symbols(i);
+       set[i].res=eval(el);
+       val.push_back(set[i].res);
+       d+=(set[i].res-set[i].y_value)*(set[i].res-set[i].y_value);
     }
     sem_train_cases.push_back(val);
     d=sqrt(d/nrow);
@@ -1000,16 +1041,20 @@ void reproduction(int i){
         int p1=tournament_selection();
         sem_train_cases_new.push_back(sem_train_cases[p1]);
         fit_new.push_back(fit_[p1]);
+        if (sem_repulsors.size()>0) 
+        	repulsor_distances_new.push_back(repulsor_distances[p1]);
         sem_test_cases_new.push_back(sem_test_cases[p1]);
         fit_new_test.push_back(fit_test[p1]);
     }
     else{
         sem_train_cases_new.push_back(sem_train_cases[i]);
         fit_new.push_back(fit_[i]);
+        if (sem_repulsors.size()>0) 
+        	repulsor_distances_new.push_back(repulsor_distances[i]);
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied reproduction\n";
+    cout<<"Variation: applied reproduction"<<endl;
 }
 
 
@@ -1037,22 +1082,26 @@ void geometric_semantic_crossover(int i){
         }
         sem_train_cases_new.push_back(val);
         update_training_fitness(val,1);
+        if (sem_repulsors.size()>0) 
+        	update_repulsor_distances(val,1);
 
         for(int j=0;j<nrow_test;j++){
             double sigmoid_test=1.0/(1+exp(-(sem_RT_test[j])));
 	        val_test.push_back(sem_test_cases[p1][j]*(sigmoid_test)+sem_test_cases[p2][j]*(1-sigmoid_test));
         }
-            sem_test_cases_new.push_back(val_test);
-            update_test_fitness(val_test,1);
-        }
+        sem_test_cases_new.push_back(val_test);
+        update_test_fitness(val_test,1);
+    }
 
     else{
         sem_train_cases_new.push_back(sem_train_cases[i]);
         fit_new.push_back(fit_[i]);
+        if (sem_repulsors.size()>0) 
+        	repulsor_distances_new.push_back(repulsor_distances[i]);
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied crossover\n";
+    cout<<"Variation: applied crossover"<<endl;
 }
 
 void geometric_semantic_mutation(int i){
@@ -1081,6 +1130,8 @@ void geometric_semantic_mutation(int i){
         }
 
         update_training_fitness(sem_train_cases_new[i],0);
+        if (sem_repulsors.size()>0) 
+        	update_repulsor_distances(sem_train_cases_new[i],0);
 
         for(int j=0;j<nrow_test;j++){
     	    double sigmoid_test_1=1.0/(1+exp(-(sem_RT1_test[j])));
@@ -1092,10 +1143,12 @@ void geometric_semantic_mutation(int i){
     else{
         sem_train_cases_new.push_back(sem_train_cases[i]);
         fit_new.push_back(fit_[i]);
+        if (sem_repulsors.size()>0) 
+        	repulsor_distances_new.push_back(repulsor_distances[i]);
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied mutation\n";
+    cout<<"Variation: applied mutation"<<endl;
 }
 
 
@@ -1123,6 +1176,25 @@ void update_test_fitness(vector <double> semantic_values, bool crossover){
         fit_new_test[fit_new_test.size()-1]=make_tuple(sqrt(d/nrow_test), 0, 0);
 }
 
+void update_repulsor_distances(vector <double> semantic_values, bool crossover){
+    /// calculate distances to all repulsors and update repulsor_distances_new
+    if (sem_repulsors.size()==0) 
+    	return;
+    cout<<"updating distances to semantic repulsors"<<endl;
+    vector <double> rds;
+    double d = 0;
+    for (int r=0; r < sem_repulsors.size(); r++){
+    	d = 0;
+    	for (int v=0; v < semantic_values.size(); v++){
+    		d += pow( sem_repulsors[r][v] - semantic_values[v], 2);
+    	}
+    	rds.push_back(sqrt(d));
+    }
+    if(crossover == 1)
+    	repulsor_distances_new.push_back(rds);
+    else    
+    	repulsor_distances_new[repulsor_distances_new.size()-1] = rds;
+}
 
 int best_individual(){
     double best_fitness=get<0>(fit_[0]);
@@ -1144,6 +1216,14 @@ void update_tables(){
    	sem_train_cases.clear();
     sem_train_cases.assign(sem_train_cases_new.begin(),sem_train_cases_new.end());
     sem_train_cases_new.clear();
+    if (sem_repulsors.size()>0) {
+    	cout<<"Updating Tables: "<<endl;
+    	cout<<"repulsor_distances size: "<<repulsor_distances.size()<<endl;
+    	cout<<"repulsor_distances_new size: "<<repulsor_distances_new.size()<<endl;
+    	repulsor_distances.clear();
+	    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
+	    repulsor_distances_new.clear();
+	}
    	fit_test.clear();
    	fit_test.assign(fit_new_test.begin(),fit_new_test.end());
    	fit_new_test.clear();
@@ -1209,4 +1289,35 @@ bool better (double f1, double f2){
         else
             return false;
     }
+}
+
+void add_semantic_repulsor(vector <double> semantic_values){
+	sem_repulsors.push_back(semantic_values);
+	// re-evaluate whole population and update repulsor_distances
+	repulsor_distances.clear();
+	for (int i = 0; i < sem_train_cases.size(); i++){
+		vector <double> rds;
+	    double d = 0;
+	    for (int r=0; r < sem_repulsors.size(); r++){
+	    	d = 0;
+	    	for (int v=0; v < semantic_values.size(); v++){
+	    		d += pow( sem_repulsors[r][v] - semantic_values[v], 2);
+	    	}
+	    	rds.push_back(sqrt(d));
+	    }
+	    repulsor_distances.push_back(rds);
+	}
+}
+
+void create_fake_repulsors(int num_repulsors){
+	for (int i = 0; i < num_repulsors; i++){
+		cout<<"Adding semantic repulsor with:";
+		vector<double> sems;
+		for (int v = 0; v < nvar; v++){
+			sems.push_back(frand()*100*frand());
+			cout<<" "<<sems[sems.size()-1];
+		}
+		add_semantic_repulsor(sems);
+		cout<<endl;
+	}
 }
