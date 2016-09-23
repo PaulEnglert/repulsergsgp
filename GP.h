@@ -999,8 +999,7 @@ void nsga_II_sort(population **p) {
 		for(int j=0; j<config.population_size; j++){
 			if (i == j) continue; // no need to compare to oneself
 			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
-			// use tables with *_new nameconvection
-			bool iDominatesJ = (get<0>(fit_new[i]) < get<0>(fit_new[j]));
+			bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
 			bool jDominatesI = !iDominatesJ;
 			for (int r = 0; r < sem_repulsors.size(); r++){
 				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
@@ -1110,13 +1109,20 @@ int tournament_selection(){
 	for(int i=0;i<config.tournament_size;i++){
         index[i]=int(frand()*(config.population_size-1));
 	}
-	double best_fitness=get<0>(fit_[index[0]]);
+	fitness_data best=fit_[index[0]];
 	int best_index=index[0];
 	for(int j=1;j<config.tournament_size;j++){
-		double fit=get<0>(fit_[index[j]]);
-		if(better(fit,best_fitness)){
-			best_fitness=fit;
+		fitness_data data=fit_[index[j]];
+		if (get<1>(data) < get<1>(best)){
+			// data has a better pareto rank
+			best=data;
 			best_index=index[j];
+		} else if (get<1>(data) == get<1>(best)){
+			if (get<2>(data) > get<2>(best)){
+				// data has the same pareto rank, but lies in a less crowded region
+				best=data;
+				best_index=index[j];				
+			}
 		}
 	}
 	delete[] index;
