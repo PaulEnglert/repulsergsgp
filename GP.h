@@ -94,6 +94,10 @@ typedef struct cfg_{
     int minimization_problem;
 /// variable that defines the proportion of the validation set in percent of the training set
     double validation_set_size;
+/// variable that defines the threshold considering the difference of validation and train set after which a individual is suspected to overfit
+    double semantic_repulsor_fitness_diff_threshold;
+/// variable that defines the maximum number of repulsors to keep during execution
+    int semantic_repulsor_max_number;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -635,6 +639,17 @@ void update_tables();
 
 
 /*!
+* \fn               void update_repulsors()
+* \brief            function that updates the tables used to store the semantics of the repulsors, as well as recalculates the distances of the individuals to the repulsors
+* \return           void
+* \date             TODO add date
+* \author           Paul Englert
+* \file             GP.h
+*/
+void update_repulsors();
+
+
+/*!
 * \fn               void read_input_data(char *train_file, char *test_file)
 * \brief            function that reads the data from the training file and from the test file.
 * \return           void
@@ -657,16 +672,6 @@ void read_input_data(char *train_file, char *test_file);
 */
 bool better (double f1, double f2);
 
-/*!
-* \fn               void add_semantic_repulsor(vector <double> semantic_values)
-* \brief            function that adds the given semantics to the repulsor structure
-* \param            vector <double> semantic_values: semantics of the repulsor to add
-* \return           void
-* \date             TODO add date
-* \author           Paul Englert
-* \file             GP.h
-*/
-void add_semantic_repulsor(vector <double> semantic_values);
 
 /*!
 * \fn               void create_fake_repulors(int num_repulsors)
@@ -736,6 +741,10 @@ void read_config_file(cfg *config){
 			config->minimization_problem=atoi(str2);
 		if(k==13)
 			config->validation_set_size=atof(str2);
+		if(k==14)
+			config->semantic_repulsor_fitness_diff_threshold=atof(str2);
+		if(k==15)
+			config->semantic_repulsor_max_number=atoi(str2);
         k++;        
 	}	
     f.close();
@@ -1381,6 +1390,16 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
         fit_new_val.push_back(make_tuple(sqrt(d/nrow_val), 0, 0));
     else    
         fit_new_val[fit_new_val.size()-1]=make_tuple(sqrt(d/nrow_val), 0, 0);
+
+    // check overfitting, if diff is larger than threshold, add the last entry of the new training semantics structure to repulsors
+   	double diff;
+    if (config.minimization_problem == 1)
+    	diff = get<0>(fit_new_val[fit_new_val.size()-1]) - get<0>(fit_new[fit_new.size()-1]);
+    if (config.minimization_problem != 1)
+    	diff = get<0>(fit_new[fit_new.size()-1]) - get<0>(fit_new_val[fit_new_val.size()-1]);
+    if (diff >= config.semantic_repulsor_fitness_diff_threshold){
+    	sem_repulsors_new.push_back(sem_train_cases_new[sem_train_cases_new.size()-1]);
+    }
 }
 
 
@@ -1460,6 +1479,36 @@ void update_tables(){
    	sem_test_cases_new.clear();
 }
 
+void update_repulsors(){
+	// add to repulsor table
+
+	for (int r = 0; r < sem_repulsors_new.size(); r++){
+		sem_repulsors.push_back(sem_repulsors_new[r]);
+	}
+
+	// enforce size constraint
+	if (sem_repulsors.size() > config.semantic_repulsor_max_number){
+		int N = sem_repulsors.size()-config.semantic_repulsor_max_number;
+		vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
+	}
+	// re-evaluate whole population and update repulsor_distances
+	repulsor_distances.clear();
+	for (int i = 0; i < config.population_size; i++){
+		vector <double> rds;
+	    double d = 0;
+	    for (int r=0; r < sem_repulsors.size(); r++){
+	    	d = 0;
+	    	for (int v=0; v < nvar; v++){
+	    		d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
+	    	}
+	    	rds.push_back(sqrt(d));
+	    }
+	    repulsor_distances.push_back(rds);
+	}
+	cout<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of threshold excess ("<<config.semantic_repulsor_fitness_diff_threshold<<"), total: "<<sem_repulsors.size()<<endl;
+	sem_repulsors_new.clear();
+}
+
 
 void read_input_data(char *train_file, char *test_file){
 	fstream in(train_file,ios::in);
@@ -1523,25 +1572,6 @@ bool better (double f1, double f2){
     }
 }
 
-void add_semantic_repulsor(vector <double> semantic_values){
-	sem_repulsors.push_back(semantic_values);
-	// re-evaluate whole population and update repulsor_distances
-	repulsor_distances.clear();
-	for (int i = 0; i < config.population_size; i++){
-		vector <double> rds;
-	    double d = 0;
-	    for (int r=0; r < sem_repulsors.size(); r++){
-	    	d = 0;
-	    	for (int v=0; v < semantic_values.size(); v++){
-	    		d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
-	    	}
-	    	rds.push_back(sqrt(d));
-	    }
-	    repulsor_distances.push_back(rds);
-	}
-	cout<<"Updated repulsor_distances to: "<<repulsor_distances.size()<<endl;
-}
-
 void create_fake_repulsors(int num_repulsors){
 	for (int i = 0; i < num_repulsors; i++){
 		vector<double> sems;
@@ -1551,6 +1581,26 @@ void create_fake_repulsors(int num_repulsors){
 			cout<<" "<<sems[sems.size()-1];
 		}
 		cout<<endl;
-		add_semantic_repulsor(sems);
+		sem_repulsors.push_back(sems);
+		// enforce size constraint
+		if (sem_repulsors.size() > config.semantic_repulsor_max_number){
+			int N = sem_repulsors.size()-config.semantic_repulsor_max_number;
+			vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
+		}
+	}
+
+	// re-evaluate whole population and update repulsor_distances
+	repulsor_distances.clear();
+	for (int i = 0; i < config.population_size; i++){
+		vector <double> rds;
+	    double d = 0;
+	    for (int r=0; r < sem_repulsors.size(); r++){
+	    	d = 0;
+	    	for (int v=0; v < nvar; v++){
+	    		d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
+	    	}
+	    	rds.push_back(sqrt(d));
+	    }
+	    repulsor_distances.push_back(rds);
 	}
 }

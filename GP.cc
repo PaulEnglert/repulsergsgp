@@ -86,7 +86,7 @@ int main(int argc, const char **argv){
     index_best=best_individual();
 
     // add fake repulsors for testing
-    create_fake_repulsors(3);
+    // create_fake_repulsors(3);
 
 	// main GP cycle
 	for(int num_gen=0; num_gen<config.max_number_generations; num_gen++){	
@@ -112,6 +112,8 @@ int main(int argc, const char **argv){
         nsga_II_sort((population**)&p);
         // updating the tables used to store semantics and fitness values
 		update_tables();
+        // update the repulsors table and reevaluate the distances
+        update_repulsors();
 		// index of the best individual stored in the variable best_index
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
