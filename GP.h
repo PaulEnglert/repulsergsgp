@@ -979,21 +979,64 @@ void Myevaluate_random_test(node *el, vector <double> & sem) {
 }
 
 void nsga_II_sort(population **p) {
-	cout<<"Updating nondominated rank and crowded distance measure\n";
+
+	if (sem_repulsors.size() == 0){
+		cout<<"No semantic repulsors collected yet - skipping nsga_II_sort()"<<endl;
+		return;
+	}
+
+	cout<<"Updating nondominated rank and crowded distance measure"<<endl;
+
+	vector <int> domination_front;
 
 	// for all individuals in p, calculate domination count and set fo dominated solutions
-	double *domination_counts = new double [config.population_size];
+	int *domination_counts = new int [config.population_size] {};
 	vector< vector<int> > dominated_individuals;
-	cout<<"Calculating domination count and set of dominated individuals for each individual in p\n";
+	cout<<"Calculating domination count and set of dominated individuals for each individual in p"<<endl;
 	for(int i=0; i<config.population_size; i++){
 		vector<int> d_inds;
 		for(int j=0; j<config.population_size; j++){
 			if (i == j) continue; // no need to compare to oneself
 			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
+			// use tables with *_new nameconvection
+			bool iDominatesJ = (get<0>(fit_new[i]) < get<0>(fit_new[j]));
+			bool jDominatesI = !iDominatesJ;
+			for (int r = 0; r < sem_repulsors.size(); r++){
+				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+				jDominatesI = (jDominatesI && repulsor_distances_new[i][r] < repulsor_distances_new[j][r]);
+			}
+			if (iDominatesJ) // add j to set of dominated solutions of i
+				d_inds.push_back(j);
+			else if (jDominatesI)	 // increment count of times that i has been dominated
+				domination_counts[i]++;
 		}	
+		dominated_individuals.push_back(d_inds);
+		if (domination_counts[i] == 0){
+			domination_front.push_back(i);
+			// add rank 1 to data
+			fit_new[i]=make_tuple(get<0>(fit_new[i]),1,0);
+			(*p)->fitness[i]=make_tuple(get<0>(fit_new[i]),1,0);
+		}
 	}
-	// calculate crowded distance measure to be used in combination with rank as ftness during next selection and variation phase
-	cout<<"Calculating crowded distance for each individual in p\n";
+	int front = 1;
+	while (domination_front.size()!=0){
+		cout<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
+		vector <int> next_front;
+		for (int i = 0; i < domination_front.size(); i++){
+			for (int d = 0; d < dominated_individuals[domination_front[i]].size(); d++){
+				int q = dominated_individuals[domination_front[i]][d];
+				if (find(next_front.begin(), next_front.end(), q) == next_front.end()) { // check if the index has been worked already
+					fit_new[q]=make_tuple(get<0>(fit_new[q]),front+1,0);
+					(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),front+1,0);
+					next_front.push_back(q);
+				}
+			}
+		}
+		front++;
+		domination_front = next_front;
+	} 
+	// calculate crowded distance measure to be used in combination with rank as fitness during next selection and variation phase
+	cout<<"Calculating crowded distance for each individual in p"<<endl;
 }
 
 
@@ -1054,7 +1097,7 @@ void reproduction(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied reproduction"<<endl;
+    // cout<<"Variation: applied reproduction"<<endl;
 }
 
 
@@ -1082,8 +1125,7 @@ void geometric_semantic_crossover(int i){
         }
         sem_train_cases_new.push_back(val);
         update_training_fitness(val,1);
-        if (sem_repulsors.size()>0) 
-        	update_repulsor_distances(val,1);
+        update_repulsor_distances(val,1);
 
         for(int j=0;j<nrow_test;j++){
             double sigmoid_test=1.0/(1+exp(-(sem_RT_test[j])));
@@ -1101,7 +1143,7 @@ void geometric_semantic_crossover(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied crossover"<<endl;
+    // cout<<"Variation: applied crossover"<<endl;
 }
 
 void geometric_semantic_mutation(int i){
@@ -1130,8 +1172,7 @@ void geometric_semantic_mutation(int i){
         }
 
         update_training_fitness(sem_train_cases_new[i],0);
-        if (sem_repulsors.size()>0) 
-        	update_repulsor_distances(sem_train_cases_new[i],0);
+        update_repulsor_distances(sem_train_cases_new[i],0);
 
         for(int j=0;j<nrow_test;j++){
     	    double sigmoid_test_1=1.0/(1+exp(-(sem_RT1_test[j])));
@@ -1148,7 +1189,7 @@ void geometric_semantic_mutation(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
-    cout<<"Variation: applied mutation"<<endl;
+    // cout<<"Variation: applied mutation"<<endl;
 }
 
 
@@ -1180,7 +1221,7 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
     /// calculate distances to all repulsors and update repulsor_distances_new
     if (sem_repulsors.size()==0) 
     	return;
-    cout<<"updating distances to semantic repulsors"<<endl;
+    // cout<<"updating distances to semantic repulsors"<<endl;
     vector <double> rds;
     double d = 0;
     for (int r=0; r < sem_repulsors.size(); r++){
@@ -1295,7 +1336,7 @@ void add_semantic_repulsor(vector <double> semantic_values){
 	sem_repulsors.push_back(semantic_values);
 	// re-evaluate whole population and update repulsor_distances
 	repulsor_distances.clear();
-	for (int i = 0; i < sem_train_cases.size(); i++){
+	for (int i = 0; i < config.population_size; i++){
 		vector <double> rds;
 	    double d = 0;
 	    for (int r=0; r < sem_repulsors.size(); r++){
@@ -1307,17 +1348,18 @@ void add_semantic_repulsor(vector <double> semantic_values){
 	    }
 	    repulsor_distances.push_back(rds);
 	}
+	cout<<"Updated repulsor_distances to: "<<repulsor_distances.size()<<endl;
 }
 
 void create_fake_repulsors(int num_repulsors){
 	for (int i = 0; i < num_repulsors; i++){
-		cout<<"Adding semantic repulsor with:";
 		vector<double> sems;
+		cout<<"Adding semantic repulsor with:";
 		for (int v = 0; v < nvar; v++){
 			sems.push_back(frand()*100*frand());
 			cout<<" "<<sems[sems.size()-1];
 		}
-		add_semantic_repulsor(sems);
 		cout<<endl;
+		add_semantic_repulsor(sems);
 	}
 }
