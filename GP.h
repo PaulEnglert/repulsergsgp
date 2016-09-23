@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <tuple>
 #include <time.h>
 /// Macro used to generate a random number
 #define frand() ((double) rand() / (RAND_MAX))
@@ -161,6 +162,10 @@ class node{
 		~node() {delete[] children;}
 };
 
+/// tuple containing a fitness measure, a non-dominated sorting rank and a crowded distance measure
+typedef tuple<double, int, double> fitness_data;
+/// vector of fitness data
+typedef vector< fitness_data > fitness_list;
 
 /**
  * \class population
@@ -184,27 +189,29 @@ class population{
 		int index_best;
 		/// int variable that contains the number of individuals that are inside the population
 		int num_ind;
-		/// array of training fitness values
-		double *fitness;
-		/// array of test fitness values
-		double *fitness_test;
+		/// array of training fitness data
+		fitness_data *fitness;
+		/// array of test fitness data
+		fitness_data *fitness_test;
 		/// class constructor
-		population(){individuals=new node* [config.population_size]; num_ind=0;
-		fitness=new double [config.population_size];
-		fitness_test=new double [config.population_size];
+		population(){
+			individuals=new node* [config.population_size]; 
+			num_ind=0;
+			fitness=new fitness_data [config.population_size];
+			fitness_test=new fitness_data [config.population_size];
 		};
 		/// class destructor
-		~population() { delete[] individuals;}
+		~population() { delete[] individuals; }
 };
 
-/// array of training fitness values at generation g
-vector <double> fit_;
-/// array of test fitness values at generation g
-vector <double> fit_test;
-/// array of training fitness values at the current generation g+1
-vector <double> fit_new;
-/// array of test fitness values at the current generation g+1
-vector <double> fit_new_test;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the training set at generation g
+fitness_list fit_;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the test set at generation g
+fitness_list fit_test;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the training set at generation g+1
+fitness_list fit_new;
+/// array where each element (that is a 3-tuple) contains the fitness, the nondominated sorting rank and the crowded distance measure on the test set at generation g+1
+fitness_list fit_new_test;
 
 /// array where each element (that is also an array) contains the semantics of an individual of the population, computed on the training set at generation g
 vector < vector<double> > sem_train_cases;
@@ -853,17 +860,23 @@ double eval(node *tree){
 
 
 void evaluate(population **p){
-		(*p)->fitness[0]=Myevaluate((*p)->individuals[0]);
+		(*p)->fitness[0]=make_tuple(Myevaluate((*p)->individuals[0]), 0, 0);
+		(*p)->fitness_test[0]=make_tuple(Myevaluate_test((*p)->individuals[0]), 0, 0);
 		(*p)->index_best=0;
 		fit_.push_back((*p)->fitness[0]);
-		fit_test.push_back(Myevaluate_test((*p)->individuals[0]));
+		fit_test.push_back((*p)->fitness_test[0]);
     	for(int i=1; i<config.population_size; i++){
-    		(*p)->fitness[i]=Myevaluate((*p)->individuals[i]);
+    		(*p)->fitness[i]=make_tuple(Myevaluate((*p)->individuals[i]), 0, 0);
+    		(*p)->fitness_test[i]=make_tuple(Myevaluate_test((*p)->individuals[i]), 0, 0);
     		fit_.push_back((*p)->fitness[i]);
-	       	fit_test.push_back(Myevaluate_test((*p)->individuals[i]));
-            if(better((*p)->fitness[i],(*p)->fitness[(*p)->index_best])){
+	       	fit_test.push_back((*p)->fitness_test[i]);
+            
+            if(better(get<0>((*p)->fitness[i]),get<0>((*p)->fitness[(*p)->index_best]))){
                 (*p)->index_best=i;
             }
+            // if(better((*p)->fitness[i],(*p)->fitness[(*p)->index_best])){
+            //     (*p)->index_best=i;
+            // }
         }
 }
 
@@ -940,10 +953,10 @@ int tournament_selection(){
 	for(int i=0;i<config.tournament_size;i++){
         index[i]=int(frand()*(config.population_size-1));
 	}
-	double best_fitness=fit_[index[0]];
+	double best_fitness=get<0>(fit_[index[0]]);
 	int best_index=index[0];
 	for(int j=1;j<config.tournament_size;j++){
-		double fit=fit_[index[j]];
+		double fit=get<0>(fit_[index[j]]);
 		if(better(fit,best_fitness)){
 			best_fitness=fit;
 			best_index=index[j];
@@ -1062,9 +1075,9 @@ void update_training_fitness(vector <double> semantic_values, bool crossover){
         d+=(semantic_values[j]-set[j].y_value)*(semantic_values[j]-set[j].y_value);
     }
     if(crossover==1)
-        fit_new.push_back(sqrt(d/nrow));
+        fit_new.push_back(make_tuple(sqrt(d/nrow), 0, 0));
     else    
-        fit_new[fit_new.size()-1]=sqrt(d/nrow);
+        fit_new[fit_new.size()-1]=make_tuple(sqrt(d/nrow), 0, 0);
 }
 
 
@@ -1074,18 +1087,18 @@ void update_test_fitness(vector <double> semantic_values, bool crossover){
         d+=(semantic_values[j-nrow]-set[j].y_value)*(semantic_values[j-nrow]-set[j].y_value);
     }
     if(crossover == 1)
-        fit_new_test.push_back(sqrt(d/nrow_test));
+        fit_new_test.push_back(make_tuple(sqrt(d/nrow_test), 0, 0));
     else    
-        fit_new_test[fit_new_test.size()-1]=sqrt(d/nrow_test);
+        fit_new_test[fit_new_test.size()-1]=make_tuple(sqrt(d/nrow_test), 0, 0);
 }
 
 
 int best_individual(){
-    double best_fitness=fit_[0];
+    double best_fitness=get<0>(fit_[0]);
     int best_index=0;
     for(unsigned int i=0;i<fit_.size();i++){
-        if(better(fit_[i],best_fitness)){
-            best_fitness=fit_[i];
+        if(better(get<0>(fit_[i]),best_fitness)){
+            best_fitness=get<0>(fit_[i]);
             best_index=i;
         }
    }
