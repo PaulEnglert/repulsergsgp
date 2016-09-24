@@ -34,6 +34,11 @@ using namespace std;
 */
 int main(int argc, const char **argv){
     
+    // redirect cout to GSGP.log
+    ofstream clog("GSGP.log");
+    std::clog.rdbuf(clog.rdbuf());
+
+
     // name of the file with training instances 
     char path_in[50]="";
     // name of the file with test instances
@@ -62,29 +67,31 @@ int main(int argc, const char **argv){
     */
     ofstream fitness_test("fitnesstest.txt",ios::out);
     
+    clog<<"Starting Setup Phase"<<endl;
     // initialization of the seed for the generation of random numbers
-	srand(time (NULL));
-	// reading the parameters of the GP algorithm
-	read_config_file(&config);
-	// reading training and test files
-	read_input_data(path_in,path_test);
-	// creation of terminal and functional symbols
+    srand(time (NULL));
+    // reading the parameters of the GP algorithm
+    read_config_file(&config);
+    // reading training and test files
+    read_input_data(path_in,path_test);
+    // creation of terminal and functional symbols
     create_T_F();
     // creation of an empty population
-	population *p=new population();
-	// initialization of the population
-    create_population((population **)&p, config.init_type);	
+    population *p=new population();
+    // initialization of the population
+    create_population((population **)&p, config.init_type); 
     // evaluation of the individuals in the initial population
     evaluate((population**)&p);
     // writing the  training fitness of the best individual on the file fitnesstrain.txt
-    fitness_train<<Myevaluate(p->individuals[p->index_best])<<endl;
+    fitness_train<<"0\t"<<Myevaluate(p->individuals[p->index_best])<<endl;
     // writing the validation fitness of the best individual on the file fitnesstest.txt
-    fitness_val<<Myevaluate_val(p->individuals[p->index_best])<<endl;
-	// writing the test fitness of the best individual on the file fitnesstest.txt
-    fitness_test<<Myevaluate_test(p->individuals[p->index_best])<<endl;
-	// index of the best individual stored in the variable best_index
+    fitness_val<<"0\t"<<Myevaluate_val(p->individuals[p->index_best])<<endl;
+    // writing the test fitness of the best individual on the file fitnesstest.txt
+    fitness_test<<"0\t"<<Myevaluate_test(p->individuals[p->index_best])<<endl;
+    // index of the best individual stored in the variable best_index
     index_best=best_individual();
 
+    clog<<"Finished Setup Phase"<<endl<<endl;
     // add fake repulsors for testing
     // create_fake_repulsors(3);
 
@@ -92,7 +99,9 @@ int main(int argc, const char **argv){
 	for(int num_gen=0; num_gen<config.max_number_generations; num_gen++){	
         
         cout<<"Generation "<<num_gen+1<<endl;
+        clog<<endl<<endl<<"\t GENERATION \t "<<num_gen+1<<endl<<endl;
         // creation of a new population (without building trees!!)
+        clog<<"Starting Variation Phase"<<endl;
 		for(int k=0;k<config.population_size;k++){
             double rand_num=frand();
             // geometric semantic crossover
@@ -108,22 +117,31 @@ int main(int argc, const char **argv){
                 reproduction(k);
             }
         }
+        clog<<"Finished Variation Phase"<<endl<<endl;
+        clog<<"Starting Non-Dominated Sorting Phase"<<endl;
         // update non-domination rank and crowded distance measure
         nsga_II_sort((population**)&p);
+        clog<<"Finished Non-Dominated Sorting Phase"<<endl<<endl;
+        clog<<"Starting Structure Update Phase"<<endl;
         // updating the tables used to store semantics and fitness values
-		update_tables();
+        update_tables();
         // update the repulsors table and reevaluate the distances
         update_repulsors();
+        clog<<"Finished Updating of tables and updating repulsors"<<endl<<endl;
+
+
+        clog<<"Outputting Generation Results"<<endl<<endl;
 		// index of the best individual stored in the variable best_index
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
-        fitness_train<<"fitness: "<<get<0>(fit_[index_best])<<" front-level: "<<get<1>(fit_[index_best])<<" CD: "<<get<2>(fit_[index_best])<<endl;
+        fitness_train<<num_gen+1<<"\tfitness: "<<get<0>(fit_[index_best])<<" front-level: "<<get<1>(fit_[index_best])<<" CD: "<<get<2>(fit_[index_best])<<endl;
         // writing the  validation fitness of the best individual on the file fitnesstest.txt
-        fitness_val<<get<0>(fit_val[index_best])<<endl;
+        fitness_val<<num_gen+1<<"\t"<<get<0>(fit_val[index_best])<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt
-        fitness_test<<get<0>(fit_test[index_best])<<endl;
+        fitness_test<<num_gen+1<<"\t"<<get<0>(fit_test[index_best])<<endl;
     }    
     
+    clog<<endl<<"Starting Cleanup"<<endl;
     // at the end of the execution all the data structures are deleted in order to deallocate memory
 	for(int k=0; k<config.population_size; k++){
         delete_individual(p->individuals[k]);
@@ -141,5 +159,6 @@ int main(int argc, const char **argv){
 		symbols.erase(symbols.begin()+i);
 	}
 	symbols.clear();
+    clog<<endl<<"Finished Cleanup"<<endl;
 	return 0;
 }

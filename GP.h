@@ -1130,7 +1130,7 @@ void Myevaluate_random_test(node *el, vector <double> & sem) {
 void nsga_II_sort(population **p) {
 
 	if (sem_repulsors.size() == 0){
-		cout<<"No semantic repulsors collected - skipping nsga_II_sort()"<<endl;
+		clog<<"\t"<<"No semantic repulsors collected - skipping nsga_II_sort()"<<endl;
 		return;
 	}
 
@@ -1142,14 +1142,14 @@ void nsga_II_sort(population **p) {
 
 	int front = 1;
 	while (domination_front.size()!=0){
-		cout<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
+		clog<<"\t"<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
 
 		vector <int> next_front;
 		extract_next_front(front, &next_front, p, &domination_front, (int**)&domination_counts, &dominated_individuals);
 		
 		// estimate the average cuboid around an individual formed by the nearest neihbours
 		// QUESTION: should this also include the fitness, or just the distances to a repulsor? I'd say it should include the fitness...
-		cout<<"Calculating crowded distance for each individual in front "<<front<<endl;
+		clog<<"\t"<<"Calculating crowded distance for each individual in front "<<front<<" based on "<<sem_repulsors.size()<<" objectives (including fitness)"<<endl;
 		calculate_crowded_distance(p, &domination_front, true);
 
 		// update iteration data
@@ -1159,7 +1159,7 @@ void nsga_II_sort(population **p) {
 }
 
 void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals){
-	cout<<"Calculating domination count and set of dominated individuals for each individual in p"<<endl;
+	clog<<"\t"<<"Calculating domination count and set of dominated individuals for each individual in p"<<endl;
 	for(int i=0; i<config.population_size; i++){
 		vector<int> d_inds;
 		for(int j=0; j<config.population_size; j++){
@@ -1572,7 +1572,7 @@ void update_repulsors(){
 	    }
 	    repulsor_distances.push_back(rds);
 	}
-	cout<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of threshold excess ("<<config.semantic_repulsor_fitness_diff_threshold<<"), total: "<<sem_repulsors.size()<<endl;
+	clog<<"\t"<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of threshold excess ("<<config.semantic_repulsor_fitness_diff_threshold<<"), total: "<<sem_repulsors.size()<<endl;
 	sem_repulsors_new.clear();
 }
 
@@ -1619,7 +1619,7 @@ void read_input_data(char *train_file, char *test_file){
 	}
 	in_test.close();
 
-	cout<<"Splitting train set; validation set proportion = "<<config.validation_set_size<<endl;
+	clog<<"\t"<<"Splitting train set - validation set proportion = "<<config.validation_set_size<<endl;
 	nrow_val = floor(config.validation_set_size*nrow);
 	nrow = nrow-nrow_val;
 }
@@ -1642,12 +1642,12 @@ bool better (double f1, double f2){
 void create_fake_repulsors(int num_repulsors){
 	for (int i = 0; i < num_repulsors; i++){
 		vector<double> sems;
-		cout<<"Adding semantic repulsor with:";
+		clog<<"\t"<<"Adding semantic repulsor with:";
 		for (int v = 0; v < nvar; v++){
 			sems.push_back(frand()*100*frand());
-			cout<<" "<<sems[sems.size()-1];
+			clog<<" "<<sems[sems.size()-1];
 		}
-		cout<<endl;
+		clog<<endl;
 		sem_repulsors.push_back(sems);
 		// enforce size constraint
 		if (sem_repulsors.size() > config.semantic_repulsor_max_number){

@@ -1,5 +1,6 @@
 *.ini
 *.txt
 *.out
+*.log
 GSGP
 *.sublime*
