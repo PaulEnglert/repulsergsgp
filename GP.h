@@ -494,6 +494,48 @@ void Myevaluate_random_test(node *el, vector <double> & sem);
 void nsga_II_sort(population **p);
 
 
+/*!
+* \fn                 void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals)
+* \brief             function that identifies non-domination levels, domination counts, and dominated individuals as needed for NSGA-II
+* \param          population **p: pointer to the population containing the individuals
+* \param          vector<int> *d_front: pointer to a vector of indexes that will be filled with all indexes lying on the first pareto level
+* \param          int **d_counts: pointer to an array of counts, where each position corresponds to an individual in the population, it will be filled with the count that each individual has been dominated by another indivdual
+* \param          vector< vector<int> > *d_individuals: pointer to a vector corresponds to an individual in the population and each element is a vector of indexes, that the individual dominates
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file              GP.h
+*/
+void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals);
+
+/*!
+* \fn                 vector <int>* extract_next_front(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals)
+* \brief             function that extracts the next deeper level of domination front
+* \param          int cur_front: index denoting the parameter *d_fronts level in the pareto hierarchie 
+* \param          population **p: pointer to the population containing the individuals
+* \param          vector <int>* next_front: pointer to a vector of indexes representing the next front (one level deeper)
+* \param          vector<int> *d_front: pointer to a vector of the indexes of the parent front
+* \param          int **d_counts: pointer to an array of counts, where each position corresponds to an individual in the population and the value determines the number of dominating individuals
+* \param          vector< vector<int> > *d_individuals: pointer to a vector corresponds to an individual in the population and each element is a vector of indexes, that the individual dominates
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file              GP.h
+*/
+void extract_next_front(int cur_front, vector <int>* next_front, population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals);
+
+/*!
+* \fn                 vector <int>* extract_next_front(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals)
+* \brief             function that calculates and updates the population/fit_ tables with a crowded distance measure 
+* \param          population **p: pointer to the population containing the individuals
+* \param          vector<int>*: vector of individuals indexes that make up the crowd in which the distances should be calculated 
+* \param          bool includeFitness: flag whether to include fitness as an objective or not
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file              GP.h
+*/
+void calculate_crowded_distance(population **p, vector<int> *crowd, bool includeFitness);
 
 /*!
 * \fn                void update_terminal_symbols(int i)
@@ -615,6 +657,17 @@ void update_test_fitness(vector <double> semantic_values, bool crossover);
 * \file               GP.h
 */
 void update_repulsor_distances(vector <double> semantic_values, bool crossover);
+
+/*!
+* \fn               double is_overfitting(int i)
+* \brief             function that calculates whether an individual i is overfitting, based on the difference in validation and training data and the configured threshold.
+* \param            int i: index of the individual to check
+* \return           bool: if the individual i is overfitting
+* \date             TODO add date
+* \author          Paul Englert
+* \file               GP.h
+*/
+bool is_overfitting(int i);
 
 /*!
 * \fn                int best_individual()
@@ -1077,17 +1130,35 @@ void Myevaluate_random_test(node *el, vector <double> & sem) {
 void nsga_II_sort(population **p) {
 
 	if (sem_repulsors.size() == 0){
-		cout<<"No semantic repulsors collected yet - skipping nsga_II_sort()"<<endl;
+		cout<<"No semantic repulsors collected - skipping nsga_II_sort()"<<endl;
 		return;
 	}
 
-	cout<<"Updating nondominated rank and crowded distance measure"<<endl;
-
 	vector <int> domination_front;
-
-	// for all individuals in p, calculate domination count and set fo dominated solutions
 	int *domination_counts = new int [config.population_size] {};
 	vector< vector<int> > dominated_individuals;
+	
+	perform_fast_non_domination_sort(p, &domination_front, (int**)&domination_counts, &dominated_individuals);
+
+	int front = 1;
+	while (domination_front.size()!=0){
+		cout<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
+
+		vector <int> next_front;
+		extract_next_front(front, &next_front, p, &domination_front, (int**)&domination_counts, &dominated_individuals);
+		
+		// estimate the average cuboid around an individual formed by the nearest neihbours
+		// QUESTION: should this also include the fitness, or just the distances to a repulsor? I'd say it should include the fitness...
+		cout<<"Calculating crowded distance for each individual in front "<<front<<endl;
+		calculate_crowded_distance(p, &domination_front, true);
+
+		// update iteration data
+		front++;
+		domination_front = next_front;
+	}
+}
+
+void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals){
 	cout<<"Calculating domination count and set of dominated individuals for each individual in p"<<endl;
 	for(int i=0; i<config.population_size; i++){
 		vector<int> d_inds;
@@ -1103,78 +1174,75 @@ void nsga_II_sort(population **p) {
 			if (iDominatesJ) // add j to set of dominated solutions of i
 				d_inds.push_back(j);
 			else if (jDominatesI)	 // increment count of times that i has been dominated
-				domination_counts[i]++;
+				(*d_counts)[i]++;
 		}	
-		dominated_individuals.push_back(d_inds);
-		if (domination_counts[i] == 0){
-			domination_front.push_back(i);
+		(*d_individuals).push_back(d_inds);
+		if ((*d_counts)[i] == 0){
+			(*d_front).push_back(i);
 			// add rank 1 to data
 			fit_new[i]=make_tuple(get<0>(fit_new[i]),1,0);
 			(*p)->fitness[i]=make_tuple(get<0>(fit_new[i]),1,0);
 		}
 	}
-	int front = 1;
-	while (domination_front.size()!=0){
-		cout<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
-		vector <int> next_front;
-		for (int i = 0; i < domination_front.size(); i++){
-			// extract next front and update ranks
-			for (int d = 0; d < dominated_individuals[domination_front[i]].size(); d++){
-				int q = dominated_individuals[domination_front[i]][d];
-				if (find(next_front.begin(), next_front.end(), q) == next_front.end()) { // check if the index has been worked already
-					fit_new[q]=make_tuple(get<0>(fit_new[q]),front+1,0);
-					(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),front+1,0);
-					next_front.push_back(q);
-				}
+}
+
+void extract_next_front(int cur_front, vector <int>* next_front, population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals){
+	for (int i = 0; i < (*d_front).size(); i++){
+		// extract next front and update ranks
+		for (int d = 0; d < (*d_individuals)[(*d_front)[i]].size(); d++){
+			int q = (*d_individuals)[(*d_front)[i]][d];
+			if (find((*next_front).begin(), (*next_front).end(), q) == (*next_front).end()) { // check if the index has been added to the next front
+				fit_new[q]=make_tuple(get<0>(fit_new[q]),cur_front+1,0);
+				(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),cur_front+1,0);
+				(*d_counts)[q]--;
+				if ((*d_counts)[q] == 0)
+					(*next_front).push_back(q);
 			}
 		}
-		cout<<"Calculating crowded distance for each individual in front "<<front<<endl;
-		// estimate the average cuboid around an individual formed by the nearest neihbours
-		// QUESTION: should this also include the fitness, or just the distances to a repulsor? I'd say yes...
-		for (int o = 0; o <= sem_repulsors.size(); o++){ 
-			// gather values from the objective and add into ascendingly sorted vector front_values
-			vector< tuple<int, double> > front_values;
-			for (int i = 0; i < domination_front.size(); i++){
-				tuple<int, double> value;
-				if (o == sem_repulsors.size()){
-					// use fitness as objective
-					value = make_tuple(domination_front[i], get<0>(fit_new[i]));
-				} else {
-					// use distance to repulsor objective o
-					value = make_tuple(domination_front[i], repulsor_distances_new[i][o]);
-				}
-				auto it = lower_bound(front_values.begin(), front_values.end(), value,
-                          [](tuple<int, double> const &t1, tuple<int, double> const &t2)
-                          { return get<1>(t1) < get<1>(t2); });
-				front_values.insert(it, value);
+	}
+}
+
+void calculate_crowded_distance(population **p, vector<int> *crowd, bool includeFitness){
+	// if fitness is to be included it will be the last objective to be calculated
+	int numberObjectives = sem_repulsors.size();
+	if (!includeFitness)
+		numberObjectives--;
+
+	for (int o = 0; o <= numberObjectives; o++){ 
+		// gather values from the objective and add into ascendingly sorted vector crowd_values
+		vector< tuple<int, double> > crowd_values;
+		for (int i = 0; i < (*crowd).size(); i++){
+			tuple<int, double> value;
+			if (o == sem_repulsors.size()){
+				// use fitness as objective
+				value = make_tuple((*crowd)[i], get<0>(fit_new[i]));
+			} else {
+				// use distance to repulsor objective o
+				value = make_tuple((*crowd)[i], repulsor_distances_new[i][o]);
 			}
-
-			// print out vector to check sorting
-			// cout<<"sorted vector of values of front "<<front<<" corresponding to objective "<<o<<" (max "<<sem_repulsors.size()<<"):"<<endl;
-			// for (int i = 0; i < front_values.size(); i++){
-			// 	cout<<"("<<get<0>(front_values[i])<<","<<get<1>(front_values[i])<<"),";
-			// }
-			// cout<<endl;
-
-			// set distance of first and last element to infinite
-			int q = get<0>(front_values[0]);
-			fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
-			(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
-			q = get<0>(front_values[front_values.size()-1]);
-			fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
-			(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
-			for (int q = 1; q < front_values.size()-1; q++){
-				// cout<<"calculating cd: "<<get<2>(fit_new[q])<<"+"<<get<1>(front_values[q+1])<<"-"<<get<1>(front_values[q-1])<<"/"<<get<1>(front_values[front_values.size()-1])<<"-"<<get<1>(front_values[0])<<endl;
-				double dist = get<2>(fit_new[q]) + (get<1>(front_values[q+1])-get<1>(front_values[q-1]))/(get<1>(front_values[front_values.size()-1])-get<1>(front_values[0]));
-				fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
-				(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
-			}
-
+			// find position to insert value tuple into
+			auto it = lower_bound(crowd_values.begin(), crowd_values.end(), value,
+                      [](tuple<int, double> const &t1, tuple<int, double> const &t2)
+                      { return get<1>(t1) < get<1>(t2); });
+			// insert onto sorted array
+			crowd_values.insert(it, value);
 		}
 
-		// update iteration data
-		front++;
-		domination_front = next_front;
+		// set distance of first element to infinite
+		int q = get<0>(crowd_values[0]);
+		fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+		(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+		// set distance of last element to infinite
+		q = get<0>(crowd_values[crowd_values.size()-1]);
+		fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+		(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),numeric_limits<double>::infinity());
+		// set distance of every other element to calculated crowded distance
+		for (int q = 1; q < crowd_values.size()-1; q++){
+			double dist = get<2>(fit_new[q]) + (get<1>(crowd_values[q+1])-get<1>(crowd_values[q-1]))/(get<1>(crowd_values[crowd_values.size()-1])-get<1>(crowd_values[0]));
+			fit_new[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
+			(*p)->fitness[q]=make_tuple(get<0>(fit_new[q]),get<1>(fit_new[q]),dist);
+		}
+
 	}
 }
 
@@ -1207,15 +1275,15 @@ int tournament_selection(){
 	fitness_data best=fit_[index[0]];
 	int best_index=index[0];
 	for(int j=1;j<config.tournament_size;j++){
-		fitness_data data=fit_[index[j]];
-		if (get<1>(data) < get<1>(best)){
-			// data has a better pareto rank
-			best=data;
+		fitness_data opponent=fit_[index[j]];
+		if (get<1>(opponent) < get<1>(best)){
+			// opponent has a better pareto rank
+			best=opponent;
 			best_index=index[j];
-		} else if (get<1>(data) == get<1>(best)){
-			if (get<2>(data) > get<2>(best)){
+		} else if (get<1>(opponent) == get<1>(best)){
+			if (get<2>(opponent) > get<2>(best)){
 				// data has the same pareto rank, but lies in a less crowded region
-				best=data;
+				best=opponent;
 				best_index=index[j];				
 			}
 		}
@@ -1265,6 +1333,8 @@ void geometric_semantic_crossover(int i){
         vector <double> val;
         vector <double> val_val;
         vector <double> val_test;
+
+        // train
         for(int j=0;j<nrow;j++){
             double sigmoid=1.0/(1+exp(-(sem_RT[j])));
 	        val.push_back(sem_train_cases[p1][j]*(sigmoid)+sem_train_cases[p2][j]*(1-sigmoid));
@@ -1328,6 +1398,7 @@ void geometric_semantic_mutation(int i){
         delete_individual(RT);
         delete_individual(RT_2);
 
+        // train
         for(int j=0;j<nrow;j++){
             double sigmoid_1=1.0/(1+exp(-(sem_RT1[j])));
             double sigmoid_2=1.0/(1+exp(-(sem_RT2[j])));
@@ -1391,13 +1462,8 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
     else    
         fit_new_val[fit_new_val.size()-1]=make_tuple(sqrt(d/nrow_val), 0, 0);
 
-    // check overfitting, if diff is larger than threshold, add the last entry of the new training semantics structure to repulsors
-   	double diff;
-    if (config.minimization_problem == 1)
-    	diff = get<0>(fit_new_val[fit_new_val.size()-1]) - get<0>(fit_new[fit_new.size()-1]);
-    if (config.minimization_problem != 1)
-    	diff = get<0>(fit_new[fit_new.size()-1]) - get<0>(fit_new_val[fit_new_val.size()-1]);
-    if (diff >= config.semantic_repulsor_fitness_diff_threshold){
+    // check overfitting, and add the individual to the repulsors
+    if (is_overfitting(fit_new_val.size()-1)){
     	sem_repulsors_new.push_back(sem_train_cases_new[sem_train_cases_new.size()-1]);
     }
 }
@@ -1418,7 +1484,7 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
     /// calculate distances to all repulsors and update repulsor_distances_new
     if (sem_repulsors.size()==0) 
     	return;
-    // cout<<"updating distances to semantic repulsors"<<endl;
+
     vector <double> rds;
     double d = 0;
     for (int r=0; r < sem_repulsors.size(); r++){
@@ -1446,6 +1512,11 @@ int best_individual(){
    return best_index;
 }
 
+bool is_overfitting(int i){
+	double diff = abs(get<0>(fit_new_val[i]) - get<0>(fit_new[i]));
+    return (diff >= config.semantic_repulsor_fitness_diff_threshold);
+}
+
 
 void update_tables(){
 	// training set
@@ -1455,14 +1526,10 @@ void update_tables(){
    	sem_train_cases.clear();
     sem_train_cases.assign(sem_train_cases_new.begin(),sem_train_cases_new.end());
     sem_train_cases_new.clear();
-    if (sem_repulsors.size()>0) {
-    	cout<<"Updating Tables: "<<endl;
-    	cout<<"repulsor_distances size: "<<repulsor_distances.size()<<endl;
-    	cout<<"repulsor_distances_new size: "<<repulsor_distances_new.size()<<endl;
-    	repulsor_distances.clear();
-	    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
-	    repulsor_distances_new.clear();
-	}
+    // repulsors
+	repulsor_distances.clear();
+    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
+    repulsor_distances_new.clear();
 	// validation set
    	fit_val.clear();
    	fit_val.assign(fit_new_val.begin(),fit_new_val.end());
@@ -1481,16 +1548,16 @@ void update_tables(){
 
 void update_repulsors(){
 	// add to repulsor table
-
 	for (int r = 0; r < sem_repulsors_new.size(); r++){
 		sem_repulsors.push_back(sem_repulsors_new[r]);
 	}
 
-	// enforce size constraint
-	if (sem_repulsors.size() > config.semantic_repulsor_max_number){
+	// enforce size constraint of configuration (-1 means no maximum limit is set)
+	if (config.semantic_repulsor_max_number > -1 && sem_repulsors.size() > config.semantic_repulsor_max_number){
 		int N = sem_repulsors.size()-config.semantic_repulsor_max_number;
 		vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
 	}
+
 	// re-evaluate whole population and update repulsor_distances
 	repulsor_distances.clear();
 	for (int i = 0; i < config.population_size; i++){

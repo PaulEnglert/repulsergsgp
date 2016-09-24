@@ -128,10 +128,11 @@ int main(int argc, const char **argv){
 	for(int k=0; k<config.population_size; k++){
         delete_individual(p->individuals[k]);
 	}
-	delete[] p->fitness;
+    delete[] p->fitness;
+	delete[] p->fitness_val;
 	delete[] p->fitness_test;
 	delete p;	
-	for(int i=0; i<nrow+nrow_test; i++){
+	for(int i=0; i<nrow+nrow_val+nrow_test; i++){
         delete[] set[i].vars;
 	}
 	delete[] set;
