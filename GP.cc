@@ -34,10 +34,13 @@ using namespace std;
 */
 int main(int argc, const char **argv){
     
-    // redirect cout to GSGP.log
-    ofstream clog("GSGP.log");
-    std::clog.rdbuf(clog.rdbuf());
+    stringstream strm;
+    strm << time(nullptr);
+    string stamp = strm.str();
 
+    // redirect cout to GSGP.log
+    ofstream clog("results/"+stamp+"-GSGP.log");
+    std::clog.rdbuf(clog.rdbuf());
 
     // name of the file with training instances 
     char path_in[50]="";
@@ -57,15 +60,16 @@ int main(int argc, const char **argv){
     /*
     pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
     */
-    ofstream fitness_train("fitnesstrain.txt",ios::out);
+    ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
+    fitness_train<<"gen\tfitness\tpr\tcd"<<endl;
     /*
     pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
     */
-    ofstream fitness_val("fitnessvalidation.txt",ios::out);
+    ofstream fitness_val("results/"+stamp+"-fitnessvalidation.txt",ios::out);
     /*
     pointer to the file fitnesstest.txt containing the training fitness of the best individual at each generation
     */
-    ofstream fitness_test("fitnesstest.txt",ios::out);
+    ofstream fitness_test("results/"+stamp+"-fitnesstest.txt",ios::out);
     
     clog<<"Starting Setup Phase"<<endl;
     // initialization of the seed for the generation of random numbers
@@ -134,7 +138,7 @@ int main(int argc, const char **argv){
 		// index of the best individual stored in the variable best_index
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
-        fitness_train<<num_gen+1<<"\tfitness: "<<get<0>(fit_[index_best])<<" front-level: "<<get<1>(fit_[index_best])<<" CD: "<<get<2>(fit_[index_best])<<endl;
+        fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<get<2>(fit_[index_best])<<endl;
         // writing the  validation fitness of the best individual on the file fitnesstest.txt
         fitness_val<<num_gen+1<<"\t"<<get<0>(fit_val[index_best])<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt

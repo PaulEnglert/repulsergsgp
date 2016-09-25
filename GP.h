@@ -98,6 +98,8 @@ typedef struct cfg_{
     double semantic_repulsor_fitness_diff_threshold;
 /// variable that defines the maximum number of repulsors to keep during execution
     int semantic_repulsor_max_number;
+/// variable that indicates whether to determine the difference of individuals by fitness or crowded_distance
+    int use_crowded_distance;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -738,6 +740,7 @@ bool better (double f1, double f2);
 void create_fake_repulsors(int num_repulsors);
 
 void read_config_file(cfg *config){
+	clog<<"\t"<<"Reading configuration data"<<endl;
 	fstream f("configuration.ini", ios::in);
 	if (!f.is_open()) {
     		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
@@ -764,6 +767,7 @@ void read_config_file(cfg *config){
 				i++;
 			}
 		}
+		clog<<"\t\t"<<str<<endl;
 		if(k==0)
 			config->population_size = atoi(str2);
 		if(k==1)
@@ -798,6 +802,8 @@ void read_config_file(cfg *config){
 			config->semantic_repulsor_fitness_diff_threshold=atof(str2);
 		if(k==15)
 			config->semantic_repulsor_max_number=atoi(str2);
+		if(k==16)
+			config->use_crowded_distance=atoi(str2);
         k++;        
 	}	
     f.close();
@@ -1276,16 +1282,25 @@ int tournament_selection(){
 	int best_index=index[0];
 	for(int j=1;j<config.tournament_size;j++){
 		fitness_data opponent=fit_[index[j]];
-		if (get<1>(opponent) < get<1>(best)){
-			// opponent has a better pareto rank
+		if (sem_repulsors.size()>0){
+			if (get<1>(opponent) < get<1>(best)){
+				// opponent has a better pareto rank
+				best=opponent;
+				best_index=index[j];
+			} else if (get<1>(opponent) == get<1>(best)){
+				if (config.use_crowded_distance == 1 && get<2>(opponent) > get<2>(best)){
+					// data has the same pareto rank, but lies in a less crowded region
+					best=opponent;
+					best_index=index[j];				
+				} if (better(get<0>(opponent), get<0>(best))){
+					best=opponent;
+					best_index=index[j];
+				}
+			}
+		}
+		else if (better(get<0>(opponent), get<0>(best))){
 			best=opponent;
 			best_index=index[j];
-		} else if (get<1>(opponent) == get<1>(best)){
-			if (get<2>(opponent) > get<2>(best)){
-				// data has the same pareto rank, but lies in a less crowded region
-				best=opponent;
-				best_index=index[j];				
-			}
 		}
 	}
 	delete[] index;
