@@ -727,6 +727,18 @@ void read_input_data(char *train_file, char *test_file);
 */
 bool better (double f1, double f2);
 
+/*!
+* \fn               bool nsga_II_better (tuple<double, int, double> i1, tuple<double, int, double> i2)
+* \brief            function that compares two solutions.
+* \param            tuple<double, int, double> i1: fitness, pareto rank and crowded distance value of an individual
+* \param            tuple<double, int, double> i2: fitness, pareto rank and crowded distance value of an individual
+* \return           bool: true if i1 is better than i2, false in the opposite case
+* \date             TODO add date
+* \author           Paul Englert
+* \file             GP.h
+*/
+bool nsga_II_better (tuple<double, int, double> i1, tuple<double, int, double> i2);
+
 
 /*!
 * \fn               void create_fake_repulors(int num_repulsors)
@@ -1057,7 +1069,7 @@ void evaluate(population **p){
 	       	fit_val.push_back((*p)->fitness_val[i]);
 	       	fit_test.push_back((*p)->fitness_test[i]);
 
-            if(better(get<0>((*p)->fitness[i]),get<0>((*p)->fitness[(*p)->index_best]))){
+            if(nsga_II_better((*p)->fitness[i],(*p)->fitness[(*p)->index_best])){
                 (*p)->index_best=i;
             }
         }
@@ -1162,6 +1174,7 @@ void nsga_II_sort(population **p) {
 		front++;
 		domination_front = next_front;
 	}
+	delete[] domination_counts;
 }
 
 void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals){
@@ -1185,7 +1198,7 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 		(*d_individuals).push_back(d_inds);
 		if ((*d_counts)[i] == 0){
 			(*d_front).push_back(i);
-			// add rank 1 to data
+			// add rank to data
 			fit_new[i]=make_tuple(get<0>(fit_new[i]),1,0);
 			(*p)->fitness[i]=make_tuple(get<0>(fit_new[i]),1,0);
 		}
@@ -1282,25 +1295,9 @@ int tournament_selection(){
 	int best_index=index[0];
 	for(int j=1;j<config.tournament_size;j++){
 		fitness_data opponent=fit_[index[j]];
-		if (sem_repulsors.size()>0){
-			if (get<1>(opponent) < get<1>(best)){
-				// opponent has a better pareto rank
-				best=opponent;
-				best_index=index[j];
-			} else if (get<1>(opponent) == get<1>(best)){
-				if (config.use_crowded_distance == 1 && get<2>(opponent) > get<2>(best)){
-					// data has the same pareto rank, but lies in a less crowded region
-					best=opponent;
-					best_index=index[j];				
-				} if (better(get<0>(opponent), get<0>(best))){
-					best=opponent;
-					best_index=index[j];
-				}
-			}
-		}
-		else if (better(get<0>(opponent), get<0>(best))){
+		if (nsga_II_better(opponent, best)){
 			best=opponent;
-			best_index=index[j];
+			best_index=index[j];			
 		}
 	}
 	delete[] index;
@@ -1516,11 +1513,11 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
 }
 
 int best_individual(){
-    double best_fitness=get<0>(fit_[0]);
+    fitness_data best=fit_[0];
     int best_index=0;
     for(unsigned int i=0;i<fit_.size();i++){
-        if(better(get<0>(fit_[i]),best_fitness)){
-            best_fitness=get<0>(fit_[i]);
+        if(nsga_II_better(fit_[i],best)){
+            best=fit_[i];
             best_index=i;
         }
    }
@@ -1534,6 +1531,10 @@ bool is_overfitting(int i){
 
 
 void update_tables(){
+    // repulsors
+	repulsor_distances.clear();
+    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
+    repulsor_distances_new.clear();
 	// training set
     fit_.clear();
    	fit_.assign(fit_new.begin(),fit_new.end());
@@ -1541,10 +1542,6 @@ void update_tables(){
    	sem_train_cases.clear();
     sem_train_cases.assign(sem_train_cases_new.begin(),sem_train_cases_new.end());
     sem_train_cases_new.clear();
-    // repulsors
-	repulsor_distances.clear();
-    repulsor_distances.assign(repulsor_distances_new.begin(), repulsor_distances_new.end());
-    repulsor_distances_new.clear();
 	// validation set
    	fit_val.clear();
    	fit_val.assign(fit_new_val.begin(),fit_new_val.end());
@@ -1652,6 +1649,25 @@ bool better (double f1, double f2){
         else
             return false;
     }
+}
+
+bool nsga_II_better (tuple<double, int, double> i1, tuple<double, int, double> i2){
+	if (sem_repulsors.size()>0){
+		if (get<1>(i1) < get<1>(i2)){
+			return true;
+		} else if (get<1>(i1) == get<1>(i2)){
+			if (config.use_crowded_distance == 1 && get<2>(i1) > get<2>(i2)){
+				return true;				
+			} else if (config.use_crowded_distance == 1 && get<2>(i1) < get<2>(i2)){
+				return false;
+			} else {
+				return better(get<0>(i1), get<0>(i2));
+			}
+		}
+		return false;
+	} else {
+		return better(get<0>(i1), get<0>(i2));
+	}
 }
 
 void create_fake_repulsors(int num_repulsors){

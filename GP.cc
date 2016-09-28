@@ -40,6 +40,7 @@ int main(int argc, const char **argv){
 
     // redirect cout to GSGP.log
     ofstream clog("results/"+stamp+"-GSGP.log");
+    auto old_rdbuf = std::clog.rdbuf();
     std::clog.rdbuf(clog.rdbuf());
 
     // name of the file with training instances 
@@ -61,7 +62,7 @@ int main(int argc, const char **argv){
     pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
     */
     ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
-    fitness_train<<"gen\tfitness\tpr\tcd"<<endl;
+    fitness_train<<"gen\tfitness\tpr\tcd\t#rep"<<endl;
     /*
     pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
     */
@@ -138,7 +139,7 @@ int main(int argc, const char **argv){
 		// index of the best individual stored in the variable best_index
        	index_best=best_individual(); 
         // writing the  training fitness of the best individual on the file fitnesstrain.txt       
-        fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<get<2>(fit_[index_best])<<endl;
+        fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<get<2>(fit_[index_best])<<"\t"<<sem_repulsors.size()<<endl;
         // writing the  validation fitness of the best individual on the file fitnesstest.txt
         fitness_val<<num_gen+1<<"\t"<<get<0>(fit_val[index_best])<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt
@@ -153,7 +154,7 @@ int main(int argc, const char **argv){
     delete[] p->fitness;
 	delete[] p->fitness_val;
 	delete[] p->fitness_test;
-	delete p;	
+	delete p;
 	for(int i=0; i<nrow+nrow_val+nrow_test; i++){
         delete[] set[i].vars;
 	}
@@ -164,5 +165,7 @@ int main(int argc, const char **argv){
 	}
 	symbols.clear();
     clog<<endl<<"Finished Cleanup"<<endl;
+    // reset log buffer
+    std::clog.rdbuf(old_rdbuf);
 	return 0;
 }
