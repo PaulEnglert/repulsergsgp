@@ -1437,17 +1437,18 @@ void geometric_semantic_mutation(int i){
         update_test_fitness(sem_test_cases_new[i],0);
     }
     else{
+    	int new_index = sem_train_cases_new.size()-1;
     	// train
-        sem_train_cases_new.push_back(sem_train_cases[i]);
-        fit_new.push_back(fit_[i]);
+        sem_train_cases_new[new_index] = sem_train_cases[i];
+        fit_new[new_index] = fit_[i];
         if (sem_repulsors.size()>0) 
-        	repulsor_distances_new.push_back(repulsor_distances[i]);
+        	repulsor_distances_new[new_index] = repulsor_distances[i];
         // validation
-        sem_val_cases_new.push_back(sem_val_cases[i]);
-        fit_new_val.push_back(fit_val[i]);
+        sem_val_cases_new[new_index] = sem_val_cases[i];
+        fit_new_val[new_index] = fit_val[i];
         // test
-        sem_test_cases_new.push_back(sem_test_cases[i]);
-        fit_new_test.push_back(fit_test[i]);
+        sem_test_cases_new[new_index] = sem_test_cases[i];
+        fit_new_test[new_index] = fit_test[i];
     }
 }
 
