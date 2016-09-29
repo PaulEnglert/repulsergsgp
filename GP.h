@@ -94,12 +94,14 @@ typedef struct cfg_{
     int minimization_problem;
 /// variable that defines the proportion of the validation set in percent of the training set
     double validation_set_size;
-/// variable that defines the threshold considering the difference of validation and train set after which a individual is suspected to overfit
-    double semantic_repulsor_fitness_diff_threshold;
+/// variable that defines the minimum number of generations to run in the beginning without using the repulsors
+    double repulsor_min_age;
 /// variable that defines the maximum number of repulsors to keep during execution
     int semantic_repulsor_max_number;
 /// variable that indicates whether to determine the difference of individuals by fitness or crowded_distance
     int use_crowded_distance;
+/// variable that defines the numbers of individuals to keep as elite on the validation set
+    int validation_elite_size;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -252,6 +254,15 @@ vector < vector<double> > sem_repulsors_new;
 vector < vector<double> > repulsor_distances;
 /// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g+1
 vector < vector<double> > repulsor_distances_new;
+
+// array containing the semantics of the elite n individuals on the validation set (generation independent list of best individuals)
+vector < vector<double> > sem_val_elite;
+// array containing the fitness of the elite n individuals on the validation set
+vector <double> fit_val_elite;
+// index of the worst individual in the array of elite n individuals on the validation set
+int val_elite_worse_idx;
+// average fitness of the elite n individualson the validation set
+double val_elite_avg_fit;
 
 /// variable that stores the index of the best individual.  
 int index_best;
@@ -660,6 +671,19 @@ void update_test_fitness(vector <double> semantic_values, bool crossover);
 */
 void update_repulsor_distances(vector <double> semantic_values, bool crossover);
 
+
+/*!
+* \fn                void update_validation_elite(vector <double> semantic_values, double fitness)
+* \brief             function that checks the given semantics and adds them to the elite group on the validation set, if acceptable
+* \param            vector <double> semantic_values: vector that contains the semantics (calculated on the validation set) of an individual
+* \param            double fitness: variable that contains the fitness of the individual
+* \return           void
+* \date             TODO add date
+* \author          Paul Englert
+* \file               GP.h
+*/
+void update_validation_elite(vector <double> semantic_values, double fitness);
+
 /*!
 * \fn               double is_overfitting(int i)
 * \brief             function that calculates whether an individual i is overfitting, based on the difference in validation and training data and the configured threshold.
@@ -811,11 +835,13 @@ void read_config_file(cfg *config){
 		if(k==13)
 			config->validation_set_size=atof(str2);
 		if(k==14)
-			config->semantic_repulsor_fitness_diff_threshold=atof(str2);
+			config->repulsor_min_age=atoi(str2);
 		if(k==15)
 			config->semantic_repulsor_max_number=atoi(str2);
 		if(k==16)
 			config->use_crowded_distance=atoi(str2);
+		if(k==17)
+			config->validation_elite_size=atoi(str2);
         k++;        
 	}	
     f.close();
@@ -1364,6 +1390,7 @@ void geometric_semantic_crossover(int i){
         }
         sem_val_cases_new.push_back(val_val);
         update_validation_fitness(val_val,1);
+        update_validation_elite(sem_val_cases_new[i],get<0>(fit_new[i]));
 
         // test
         for(int j=0;j<nrow_test;j++){
@@ -1428,7 +1455,9 @@ void geometric_semantic_mutation(int i){
     	    double sigmoid_val_2=1.0/(1+exp(-(sem_RT2_val[j])));
             sem_val_cases_new[i][j]=sem_val_cases_new[i][j]+config.mutation_step*(sigmoid_val_1-sigmoid_val_2);
         }
+        // QUESTION: Is it okay to check overfitting before? It won't interfere right? if the individual would be added to the lsit, it wouldn't be overfitting...
         update_validation_fitness(sem_val_cases_new[i],0);
+        update_validation_elite(sem_val_cases_new[i],get<0>(fit_new[i]));
 
         // test
         for(int j=0;j<nrow_test;j++){
@@ -1515,6 +1544,32 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
     	repulsor_distances_new[repulsor_distances_new.size()-1] = rds;
 }
 
+void update_validation_elite(vector <double> semantic_values, double fitness){
+	if (fit_val_elite.size() == 0 || better(fitness, fit_val_elite[val_elite_worse_idx])){
+		// exchange worst with the current semantics and update the data fields
+		if (sem_val_elite.size()<config.validation_elite_size){
+			// not enough individuals in list yet, so push back
+			sem_val_elite.push_back(semantic_values);
+			fit_val_elite.push_back(fitness);
+		} else {
+			// replace
+			fit_val_elite[val_elite_worse_idx] = fitness;
+			sem_val_elite[val_elite_worse_idx] = semantic_values;
+		}
+		// update average
+		if (fit_val_elite.size() == 0) 
+			val_elite_avg_fit = 0;
+		val_elite_avg_fit = (val_elite_avg_fit*(sem_val_elite.size()-1)+fitness)/sem_val_elite.size();
+		// update index worse
+		val_elite_worse_idx = 0;
+		for (int i = 1; i<sem_val_elite.size(); i++){
+			if (better(fit_val_elite[val_elite_worse_idx], fit_val_elite[i])){
+				val_elite_worse_idx = i;
+			}
+		}
+	}
+}
+
 int best_individual(){
     fitness_data best=fit_[0];
     int best_index=0;
@@ -1528,8 +1583,10 @@ int best_individual(){
 }
 
 bool is_overfitting(int i){
-	double diff = abs(get<0>(fit_new_val[i]) - get<0>(fit_new[i]));
-    return (diff >= config.semantic_repulsor_fitness_diff_threshold);
+	// compare to average fitness of validation elite set
+	if (sem_val_elite.size()==0)
+		return false;
+	return (better(val_elite_avg_fit, get<0>(fit_new_val[i])));
 }
 
 
@@ -1561,7 +1618,13 @@ void update_tables(){
    	sem_test_cases_new.clear();
 }
 
-void update_repulsors(){
+void update_repulsors(int num_gen){
+	// check if population is old enough, otherwise discard repulsors
+	if (num_gen < config.repulsor_min_age){
+		clog<<"\tDiscarding "<<sem_repulsors_new.size()<<" repulsors due to population not old enough (min age = "<<config.repulsor_min_age<<")"<<endl;
+		sem_repulsors_new.clear();
+		return;
+	}
 	// add to repulsor table
 	for (int r = 0; r < sem_repulsors_new.size(); r++){
 		sem_repulsors.push_back(sem_repulsors_new[r]);
@@ -1587,7 +1650,7 @@ void update_repulsors(){
 	    }
 	    repulsor_distances.push_back(rds);
 	}
-	clog<<"\t"<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of threshold excess ("<<config.semantic_repulsor_fitness_diff_threshold<<"), total: "<<sem_repulsors.size()<<endl;
+	clog<<"\t"<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of being worse than the average validation elite, total: "<<sem_repulsors.size()<<endl;
 	sem_repulsors_new.clear();
 }
 

@@ -132,7 +132,7 @@ int main(int argc, const char **argv){
         // updating the tables used to store semantics and fitness values
         update_tables();
         // update the repulsors table and reevaluate the distances
-        update_repulsors();
+        update_repulsors(num_gen);
         clog<<"Finished Updating of tables and updating repulsors"<<endl<<endl;
 
 
