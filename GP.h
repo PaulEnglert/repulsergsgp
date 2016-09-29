@@ -1167,8 +1167,10 @@ void nsga_II_sort(population **p) {
 		
 		// estimate the average cuboid around an individual formed by the nearest neihbours
 		// QUESTION: should this also include the fitness, or just the distances to a repulsor? I'd say it should include the fitness...
-		clog<<"\t"<<"Calculating crowded distance for each individual in front "<<front<<" based on "<<sem_repulsors.size()<<" objectives (including fitness)"<<endl;
-		calculate_crowded_distance(p, &domination_front, true);
+		if (config.use_crowded_distance==1){
+			clog<<"\t"<<"Calculating crowded distance for each individual in front "<<front<<" based on "<<sem_repulsors.size()<<" objectives (including fitness)"<<endl;
+			calculate_crowded_distance(p, &domination_front, true);
+		}
 
 		// update iteration data
 		front++;

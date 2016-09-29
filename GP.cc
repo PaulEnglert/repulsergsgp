@@ -34,8 +34,9 @@ using namespace std;
 */
 int main(int argc, const char **argv){
     
+    time_t start_time = time(nullptr);
     stringstream strm;
-    strm << time(nullptr);
+    strm << start_time;
     string stamp = strm.str();
 
     // redirect cout to GSGP.log
@@ -165,6 +166,12 @@ int main(int argc, const char **argv){
 	}
 	symbols.clear();
     clog<<endl<<"Finished Cleanup"<<endl;
+    
+    // print out runtime
+    clog<<endl<<endl<<"================================"<<endl;
+    time_t end_time = time(nullptr);
+    clog<<endl<<"Finished in "<<(end_time-start_time)<<"s"<<endl;
+    
     // reset log buffer
     std::clog.rdbuf(old_rdbuf);
 	return 0;
