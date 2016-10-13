@@ -34,6 +34,13 @@ using namespace std;
 */
 int main(int argc, const char **argv){
     
+	// create file stamp
+
+	time_t start_time = time(nullptr);
+	stringstream strm;
+	strm << start_time;
+	string stamp = strm.str();
+
     // name of the file with training instances 
     char path_in[50]="";
     // name of the file with test instances
@@ -52,11 +59,11 @@ int main(int argc, const char **argv){
     /*
     pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
     */
-    ofstream fitness_train("fitnesstrain.txt",ios::out);
+    ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
     /*
     pointer to the file fitnesstest.txt containing the training fitness of the best individual at each generation
     */
-    ofstream fitness_test("fitnesstest.txt",ios::out);
+    ofstream fitness_test("results/"+stamp+"-fitnesstest.txt",ios::out);
     
     // initialization of the seed for the generation of random numbers
 	srand(time (NULL));
