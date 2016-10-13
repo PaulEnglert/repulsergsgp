@@ -1,3 +1,4 @@
+*.log
 *.ini
 *.txt
 *.out
