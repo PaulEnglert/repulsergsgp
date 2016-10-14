@@ -1330,7 +1330,7 @@ void geometric_semantic_crossover(int i){
 		}
 		sem_val_cases_new.push_back(val_val);
 		update_validation_fitness(val_val,1);
-		update_validation_elite(sem_val_cases_new[i],get<0>(fit_new[i]));
+		update_validation_elite(sem_val_cases_new[i],get<0>(fit_new_val[i]));
 		
 		// test
 		for(int j=0;j<nrow_test;j++){
@@ -1397,7 +1397,7 @@ void geometric_semantic_mutation(int i){
 		}
 		// QUESTION: Is it okay to check overfitting before? It won't interfere right? if the individual would be added to the lsit, it wouldn't be overfitting...
 		update_validation_fitness(sem_val_cases_new[i],0);
-		update_validation_elite(sem_val_cases_new[i],get<0>(fit_new[i]));
+		update_validation_elite(sem_val_cases_new[i],get<0>(fit_new_val[i]));
 		
 		// test
 		for(int j=0;j<nrow_test;j++){
@@ -1434,11 +1434,6 @@ void update_training_fitness(vector <double> semantic_values, bool crossover){
 		fit_new.push_back(make_tuple(sqrt(d/nrow), 0));
 	else
 		fit_new[fit_new.size()-1]=make_tuple(sqrt(d/nrow), 0);
-	
-	// check overfitting, and add the individual to the repulsors
-	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new[fit_new.size()-1]))){
-		sem_repulsors_new.push_back(sem_train_cases_new[sem_train_cases_new.size()-1]);
-	}
 }
 
 void update_validation_fitness(vector <double> semantic_values, bool crossover){
@@ -1450,6 +1445,13 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
 		fit_new_val.push_back(make_tuple(sqrt(d/nrow_val), 0));
 	else
 		fit_new_val[fit_new_val.size()-1]=make_tuple(sqrt(d/nrow_val), 0);
+	
+	
+	// check overfitting, and add the individual to the repulsors
+	int idx = fit_new_val.size()-1;
+	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
+		sem_repulsors_new.push_back(sem_train_cases_new[idx]);
+	}
 }
 
 
@@ -1535,7 +1537,7 @@ int best_individual(){
 	}
 	
 	// check if best individual is overfitting or not
-	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_[best_index]))){
+	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
 		sem_repulsors_new.push_back(sem_train_cases[best_index]);
 	}
