@@ -1659,9 +1659,16 @@ void read_input_data(char *train_file, char *test_file){
 	}
 	in_test.close();
 	
-	clog<<"\t"<<"Splitting train set - validation set proportion = "<<config.validation_set_size<<endl;
+	clog<<"\tRead Data Files: "<<endl;
+	clog<<"\t\t"<<train_file<<" (training data with "<<nrow<<" instances)"<<endl;
+	clog<<"\t\t"<<test_file<<" (test data with "<<nrow_test<<" instances)"<<endl;
+
+	clog<<"\t"<<"Splitting training data - validation set proportion = "<<config.validation_set_size<<endl;
 	nrow_val = floor(config.validation_set_size*nrow);
 	nrow = nrow-nrow_val;
+	clog<<"\t\tTraining Instances: "<<nrow<<endl;
+	clog<<"\t\tValidation Instances: "<<nrow_val<<endl;
+
 }
 
 bool better (double f1, double f2){

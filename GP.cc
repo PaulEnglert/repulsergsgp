@@ -58,7 +58,8 @@ int main(int argc, const char **argv){
 			}
 		}
 	}
-	
+
+	clog<<"Protocol of repulsor GSGP run at "<<stamp<<endl<<endl;	
 	/*
 	 pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
 	 */
