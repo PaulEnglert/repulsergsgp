@@ -565,6 +565,7 @@ void read_input_data(char *train_file, char *test_file);
 bool better (double f1, double f2);
 
 void read_config_file(cfg *config){
+	clog<<"\tReading Configuration:"<<endl;
 	fstream f("configuration.ini", ios::in);
 	if (!f.is_open()) {
     		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
@@ -576,6 +577,7 @@ void read_config_file(cfg *config){
 		char str2[100]="";
 		int j=0;
 		f.getline(str,100);
+		clog<<"\t\t"<<str<<endl;
 		if(str[0]!='\0'){
 			while(str[j]!='='){
 				j++;
@@ -1150,6 +1152,10 @@ void read_input_data(char *train_file, char *test_file){
        	set[i].y_value = atof(str);
 	}
 	in_test.close();
+
+	clog<<"\tRead Data Files: "<<endl;
+	clog<<"\t\t"<<train_file<<" (training data with "<<nrow<<" instances)"<<endl;
+	clog<<"\t\t"<<test_file<<" (test data with "<<nrow_test<<" instances)"<<endl;
 }
 
 bool better (double f1, double f2){

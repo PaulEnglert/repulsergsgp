@@ -34,12 +34,20 @@ using namespace std;
 */
 int main(int argc, const char **argv){
     
-	// create file stamp
-
+	// create timestamp
 	time_t start_time = time(nullptr);
 	stringstream strm;
 	strm << start_time;
 	string stamp = strm.str();
+	
+	// redirect cout to GSGP.log
+	ofstream clog("results/"+stamp+"-GSGP.log");
+	auto old_rdbuf = std::clog.rdbuf();
+	std::clog.rdbuf(clog.rdbuf());
+
+	clog<<"Log of standard GSGP run at "<<stamp<<endl<<endl;
+	clog<<"Starting Setup Phase"<<endl;
+	
 
     // name of the file with training instances 
     char path_in[50]="";
@@ -85,10 +93,16 @@ int main(int argc, const char **argv){
     fitness_test<<Myevaluate_test(p->individuals[p->index_best])<<endl;
 	// index of the best individual stored in the variable best_index
     index_best=best_individual();
+
+    clog<<"Finished Setup Phase"<<endl<<endl;
+    clog<<"Starting Evolution"<<endl;
+
 	// main GP cycle
 	for(int num_gen=0; num_gen<config.max_number_generations; num_gen++){	
         
         cout<<"Generation "<<num_gen+1<<endl;
+        clog<<"\tGeneration "<<num_gen+1<<endl;
+        clog<<"\t\tStarting Variation Phase"<<endl;
         // creation of a new population (without building trees!!)
 		for(int k=0;k<config.population_size;k++){
             double rand_num=frand();
@@ -105,6 +119,8 @@ int main(int argc, const char **argv){
                 reproduction(k);
             }
         }
+        clog<<"\t\tFinished Variation Phase"<<endl;
+        clog<<"\t\tStarting Update Phase"<<endl;
         
         // updating the tables used to store semantics and fitness values
 		update_tables();
@@ -114,8 +130,12 @@ int main(int argc, const char **argv){
         fitness_train<<fit_[index_best]<<endl;
         // writing the  test fitness of the best individual on the file fitnesstest.txt
         fitness_test<<fit_test[index_best]<<endl;
+
+        clog<<"\t\tFinished Update Phase"<<endl;
     }    
     
+
+    clog<<endl<<"Starting Cleanup Phase"<<endl;
     // at the end of the execution all the data structures are deleted in order to deallocate memory
 	for(int k=0; k<config.population_size; k++){
         delete_individual(p->individuals[k]);
@@ -132,5 +152,17 @@ int main(int argc, const char **argv){
 		symbols.erase(symbols.begin()+i);
 	}
 	symbols.clear();
+
+	clog<<"Finished Cleanup Phase"<<endl;
+
+
+	// print out runtime
+	clog<<endl<<endl<<"================================"<<endl;
+	time_t end_time = time(nullptr);
+	clog<<endl<<"Finished in "<<(end_time-start_time)<<"s"<<endl;
+	
+	// reset log buffer
+	std::clog.rdbuf(old_rdbuf);
+
 	return 0;
 }
