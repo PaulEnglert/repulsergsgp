@@ -88,6 +88,8 @@ typedef struct cfg_{
     double max_random_constant;
 /// variable that indicates if the problem is a minimization problem (1) or a maximization problem (0)
     int minimization_problem;
+/// variable that indicates wether the semantics should be written to a log file
+    int log_semantics;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -564,6 +566,20 @@ void read_input_data(char *train_file, char *test_file);
 */
 bool better (double f1, double f2);
 
+
+/*!
+ * \fn               void log_semantics (ofstream *csem, int num_gen)
+ * \brief            function that logs all semantics of the current population and the repulsors.
+ * \param 			 ofstream csem: the output stream to write the semantics to
+ * \param 			 int num_gen: the current generation number
+ * \return           void
+ * \date             TODO add date
+ * \author           Paul Englert
+ * \file             GP.h
+ */
+void log_semantics (ofstream *csem, int num_gen);
+
+
 void read_config_file(cfg *config){
 	clog<<"\tReading Configuration:"<<endl;
 	fstream f("configuration.ini", ios::in);
@@ -571,57 +587,61 @@ void read_config_file(cfg *config){
     		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
     		exit(-1);
 	}
-	int k=0;
 	while(!f.eof()){
-		char str[100]="";
+		char in_str[100]="";
+		char str1[100]="";
 		char str2[100]="";
 		int j=0;
-		f.getline(str,100);
-		clog<<"\t\t"<<str<<endl;
-		if(str[0]!='\0'){
-			while(str[j]!='='){
+		f.getline(in_str,100);
+		string line = string(in_str);
+		clog<<"\t\t"<<in_str<<endl;
+		if(in_str[0]!='\0'){
+			// secure the format
+			line.erase(remove(line.begin(), line.end(), ' '), line.end());
+			line.erase(remove(line.begin(), line.end(), '\t'), line.end());
+			strcpy(in_str, line.c_str());
+			while(in_str[j]!='='){
+				str1[j] = in_str[j];
 				j++;
 			}
 			j++;
 			int i=0;
-			while(str[j]==' '){
-				j++;
-			}
-			while(str[j]!='\0'){
-				str2[i] = str[j];
+			while(in_str[j]!='\0'){
+				str2[i] = in_str[j];
 				j++;
 				i++;
 			}
 		}
-		if(k==0)
+		if(strcmp(str1, "population_size") == 0)
 			config->population_size = atoi(str2);
-		if(k==1)
+		if(strcmp(str1, "max_number_generations") == 0)
 			config->max_number_generations=atoi(str2); 
-		if(k==2)
+		if(strcmp(str1, "init_type") == 0)
 			config->init_type=atoi(str2);
-		if(k==3)
+		if(strcmp(str1, "p_crossover") == 0)
 			config->p_crossover=atof(str2);
-		if(k==4)
+		if(strcmp(str1, "p_mutation") == 0)
 			config->p_mutation=atof(str2);
-		if(k==5)	
+		if(strcmp(str1, "max_depth_creation") == 0)	
 			config->max_depth_creation=atoi(str2);
-		if(k==6)	
+		if(strcmp(str1, "tournament_size") == 0)	
 			config->tournament_size=atoi(str2);
-		if(k==7)	
+		if(strcmp(str1, "zero_depth") == 0)	
 			config->zero_depth=atoi(str2);
-		if(k==8)
+		if(strcmp(str1, "mutation_step") == 0)
 			config->mutation_step=atof(str2);
-		if(k==9){
+		if(strcmp(str1, "num_random_constants") == 0){
 			config->num_random_constants=atoi(str2);	
 			NUM_CONSTANT_SYMBOLS=config->num_random_constants;
         }
-        if(k==10)
+        if(strcmp(str1, "min_random_constant") == 0)
 			config->min_random_constant=atof(str2);
-		if(k==11)
+		if(strcmp(str1, "max_random_constant") == 0)
 			config->max_random_constant=atof(str2);
-		if(k==12)
+		if(strcmp(str1, "minimization_problem") == 0)
 			config->minimization_problem=atoi(str2);
-        k++;        
+		if(strcmp(str1, "log_semantics") == 0)
+			config->log_semantics=atoi(str2);       
 	}	
     f.close();
     if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
@@ -1171,4 +1191,21 @@ bool better (double f1, double f2){
         else
             return false;
     }
+}
+
+
+void log_semantics (ofstream *csem, int num_gen){
+	vector < vector<double> > semantics = sem_train_cases_new;
+	// no variation has been executed yet
+	if (num_gen == 0){
+		semantics = sem_train_cases;
+	}
+	// log semantics of individuals on training data
+	for (int i = 0; i < semantics.size(); i++){
+		(*csem)<<num_gen<<"\t"<<i<<"\t0";
+		for (int s = 0; s < semantics[i].size(); s++){
+			(*csem)<<"\t"<<semantics[i][s];
+		}
+		(*csem)<<endl;
+	}
 }
