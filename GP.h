@@ -104,6 +104,8 @@ typedef struct cfg_{
 	int use_only_best_as_rep_candidate;
 	/// variable that indicates whether overfitting is determined by the median or the average of the validation elites fitness
 	int overfit_by_median;
+	/// variable that indicates whether the split of the training set into validation and training data should be shuffled (different every time)
+	int shuffle_validation_split;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -833,6 +835,8 @@ void read_config_file(cfg *config){
 			config->use_only_best_as_rep_candidate=atoi(str2);
 		if(k==18)
 			config->overfit_by_median=atoi(str2);
+		if(k==19)
+			config->shuffle_validation_split=atoi(str2);
 		k++;
 	}
 	f.close();
@@ -1670,6 +1674,20 @@ void read_input_data(char *train_file, char *test_file){
 	clog<<"\tRead Data Files: "<<endl;
 	clog<<"\t\t"<<train_file<<" (training data with "<<nrow<<" instances)"<<endl;
 	clog<<"\t\t"<<test_file<<" (test data with "<<nrow_test<<" instances)"<<endl;
+
+	if (config.shuffle_validation_split==1){
+		clog<<"\tShuffling training data"<<endl;
+		int curIdx = nrow;
+		Instance tempV;
+		int rndIdx = 0;
+		while (curIdx != 0){
+			rndIdx = rand() % curIdx;
+			curIdx = curIdx - 1; 
+			tempV = set[curIdx];
+			set[curIdx] = set[rndIdx];
+			set[rndIdx] = tempV;
+		}
+	}
 
 	clog<<"\t"<<"Splitting training data - validation set proportion = "<<config.validation_set_size<<endl;
 	nrow_val = floor(config.validation_set_size*nrow);
