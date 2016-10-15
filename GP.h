@@ -1207,16 +1207,28 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
 			bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
 			bool jDominatesI = !iDominatesJ;
+			bool iIsRepulsor = false;
+			bool jIsRepulsor = false;
 			for (int r = 0; r < sem_repulsors.size(); r++){
-				// check if distance == 0 -> i is an repulsor
+				// check if distance == 0 -> i/j is an repulsor
 				if (repulsor_distances_new[i][r] == 0){
-					iDominatesJ = false;
-					jDominatesI = true;
-					break;
+					iIsRepulsor = true;
+				}
+				if (repulsor_distances_new[j][r] == 0){
+					jIsRepulsor = true;
 				}
 				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
 				jDominatesI = (jDominatesI && repulsor_distances_new[i][r] < repulsor_distances_new[j][r]);
 			}
+			// force domination if i is repulsor (only if j is not a repulsor either)
+			if (iIsRepulsor && !jIsRepulsor){
+				iDominatesJ = false;
+				jDominatesI = true;
+			} else if (iIsRepulsor && jIsRepulsor){
+				iDominatesJ = false;
+				jDominatesI = false;
+			}
+			// update data structures
 			if (iDominatesJ) // add j to set of dominated solutions of i
 				d_inds.push_back(j);
 			else if (jDominatesI)    // increment count of times that i has been dominated
