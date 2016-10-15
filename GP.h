@@ -106,6 +106,8 @@ typedef struct cfg_{
 	int overfit_by_median;
 	/// variable that indicates whether the split of the training set into validation and training data should be shuffled (different every time)
 	int shuffle_validation_split;
+	/// variable that indicates whether to log semantics of individuals and repulsors to an output file
+	int log_semantics;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -709,7 +711,7 @@ void update_tables();
 
 
 /*!
- * \fn               void update_repulsors()
+ * \fn               int update_repulsors()
  * \brief            function that updates the tables used to store the semantics of the repulsors, as well as recalculates the distances of the individuals to the repulsors
  * \return           int: the number of repulsors lost due to size constaint from configuration
  * \date             TODO add date
@@ -754,17 +756,18 @@ bool better (double f1, double f2);
  */
 bool nsga_II_better (fitness_data i1, fitness_data i2);
 
-
 /*!
- * \fn               void create_fake_repulors(int num_repulsors)
- * \brief            function that randomly creates semantic repulsors for testing purposes
- * \param            int num_repulsors: number of repulsors to create
+ * \fn               void log_semantics (ofstream *csem, int num_gen)
+ * \brief            function that logs all semantics of the current population and the repulsors.
+ * \param 			 ofstream csem: the output stream to write the semantics to
+ * \param 			 int num_gen: the current generation number
  * \return           void
  * \date             TODO add date
  * \author           Paul Englert
  * \file             GP.h
  */
-void create_fake_repulsors(int num_repulsors);
+void log_semantics (ofstream *csem, int num_gen);
+
 
 void read_config_file(cfg *config){
 	clog<<"\t"<<"Reading configuration data"<<endl;
@@ -837,6 +840,8 @@ void read_config_file(cfg *config){
 			config->overfit_by_median=atoi(str2);
 		if(k==19)
 			config->shuffle_validation_split=atoi(str2);
+		if(k==20)
+			config->log_semantics=atoi(str2);
 		k++;
 	}
 	f.close();
@@ -1729,35 +1734,27 @@ bool nsga_II_better (fitness_data i1, fitness_data i2){
 	}
 }
 
-void create_fake_repulsors(int num_repulsors){
-	for (int i = 0; i < num_repulsors; i++){
-		vector<double> sems;
-		clog<<"\t"<<"Adding semantic repulsor with:";
-		for (int v = 0; v < nvar; v++){
-			sems.push_back(frand()*100*frand());
-			clog<<" "<<sems[sems.size()-1];
-		}
-		clog<<endl;
-		sem_repulsors.push_back(sems);
-		// enforce size constraint
-		if (sem_repulsors.size() > config.semantic_repulsor_max_number){
-			long N = sem_repulsors.size()-config.semantic_repulsor_max_number;
-			vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
-		}
+void log_semantics (ofstream *csem, int num_gen){
+	// csem<<"gen\tidx\tisRep\tsemantics on training data"<<endl;
+	vector < vector<double> > semantics = sem_train_cases_new;
+	// no variation has been executed yet
+	if (num_gen == 0){
+		semantics = sem_train_cases;
 	}
-	
-	// re-evaluate whole population and update repulsor_distances
-	repulsor_distances.clear();
-	for (int i = 0; i < config.population_size; i++){
-		vector <double> rds;
-		double d = 0;
-		for (int r=0; r < sem_repulsors.size(); r++){
-			d = 0;
-			for (int v=0; v < nvar; v++){
-				d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
-			}
-			rds.push_back(sqrt(d));
+	// log semantics of individuals on training data
+	for (int i = 0; i < semantics.size(); i++){
+		(*csem)<<num_gen<<"\t"<<i<<"\t0";
+		for (int s = 0; s < semantics[i].size(); s++){
+			(*csem)<<"\t"<<semantics[i][s];
 		}
-		repulsor_distances.push_back(rds);
+		(*csem)<<endl;
 	}
+	// log repulsor semantics
+	for (int r = 0; r < sem_repulsors.size(); r++){
+		(*csem)<<num_gen<<"\t"<<r<<"\t1";
+		for (int s = 0; s < sem_repulsors[r].size(); s++){
+			(*csem)<<"\t"<<sem_repulsors[r][s];
+		}
+		(*csem)<<endl;
+	}	
 }

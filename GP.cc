@@ -100,9 +100,14 @@ int main(int argc, const char **argv){
 	
 	int reps_lost = 0;
 
+	ofstream csem;
+	if (config.log_semantics==1){
+		csem.open("results/"+stamp+"-Semantics.txt");
+		csem<<"gen\tidx\tisRep\tsemantics on training data"<<endl;
+		log_semantics(&csem, 0);
+	}
+
 	clog<<"Finished Setup Phase"<<endl<<endl;
-	// add fake repulsors for testing
-	// create_fake_repulsors(3);
 	
 	// main GP cycle
 	for(int num_gen=0; num_gen<config.max_number_generations; num_gen++){
@@ -132,6 +137,11 @@ int main(int argc, const char **argv){
 		nsga_II_sort((population**)&p);
 		clog<<"Finished Non-Dominated Sorting Phase"<<endl<<endl;
 		clog<<"Starting Structure Update Phase"<<endl;
+
+		// log semantics before anything gets updated for the next generation
+		if (config.log_semantics==1){
+			log_semantics(&csem, num_gen+1);
+		}
 		// updating the tables used to store semantics and fitness values
 		update_tables();
 		// index of the best individual stored in the variable best_index and overfitting check
@@ -155,6 +165,7 @@ int main(int argc, const char **argv){
 		fitness_val<<num_gen+1<<"\t"<<get<0>(fit_val[index_best])<<endl;
 		// writing the  test fitness of the best individual on the file fitnesstest.txt
 		fitness_test<<num_gen+1<<"\t"<<get<0>(fit_test[index_best])<<endl;
+
 	}
 	
 	clog<<endl<<"Starting Cleanup"<<endl;
@@ -182,6 +193,10 @@ int main(int argc, const char **argv){
 	time_t end_time = time(nullptr);
 	clog<<endl<<"Finished in "<<(end_time-start_time)<<"s"<<endl;
 	
+	if (config.log_semantics==1){
+		csem.close();
+	}
+
 	// reset log buffer
 	std::clog.rdbuf(old_rdbuf);
 	return 0;
