@@ -689,6 +689,17 @@ void update_validation_elite(vector <double> semantic_values, double fitness);
 bool is_overfitting(double fit);
 
 /*!
+ * \fn               void add_repulsor(vector <double> semantics)
+ * \brief             function that adds the given semantics as a repulsor if it isn't already recorded
+ * \param            vector <double> semantics: semantics of the repulsor
+ * \return           void
+ * \date             TODO add date
+ * \author          Paul Englert
+ * \file               GP.h
+ */
+void add_repulsor(vector <double> semantics);
+
+/*!
  * \fn                int best_individual()
  * \brief             function that finds the best individual in the population
  * \return           int: the index of the best individual
@@ -1479,7 +1490,7 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
 	// check overfitting, and add the individual to the repulsors
 	int idx = fit_new_val.size()-1;
 	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
-		sem_repulsors_new.push_back(sem_train_cases_new[idx]);
+		add_repulsor(sem_train_cases_new[idx]);
 	}
 }
 
@@ -1568,7 +1579,7 @@ int best_individual(){
 	// check if best individual is overfitting or not
 	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
-		sem_repulsors_new.push_back(sem_train_cases[best_index]);
+		add_repulsor(sem_train_cases[best_index]);
 	}
 	return best_index;
 }
@@ -1580,6 +1591,43 @@ bool is_overfitting(double fit){
 	return (better(val_elite_avg_fit, fit));
 }
 
+void add_repulsor(vector <double> semantics){
+	bool add = true;
+	// check in repulsor list
+	for (int r = 0; r < sem_repulsors.size(); r++){
+		bool same = true; 
+		for (int d = 0; d < sem_repulsors[r].size(); d++){
+			if (semantics[d] != sem_repulsors[r][d]){
+				same = false;
+				break;
+			}
+		}
+		if (same){
+			add = false;
+			break;
+		}
+	}
+	// check in pending repulsor list (if not already found in repulsor list)
+	if (add){
+		for (int r = 0; r < sem_repulsors_new.size(); r++){
+			bool same = true; 
+			for (int d = 0; d < sem_repulsors_new[r].size(); d++){
+				if (semantics[d] != sem_repulsors_new[r][d]){
+					same = false;
+					break;
+				}
+			}
+			if (same){
+				add = false;
+				break;
+			}
+		}
+	}
+	if (add)
+		sem_repulsors_new.push_back(semantics);
+	else
+		clog<<"\tRepulsor already recorded"<<endl;
+}
 
 void update_tables(){
 	// repulsors
