@@ -1237,6 +1237,9 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 			if (iIsRepulsor && !jIsRepulsor){
 				iDominatesJ = false;
 				jDominatesI = true;
+			} else if (!iIsRepulsor && jIsRepulsor){
+				iDominatesJ = true;
+				jDominatesI = false;
 			} else if (iIsRepulsor && jIsRepulsor){
 				iDominatesJ = false;
 				jDominatesI = false;
