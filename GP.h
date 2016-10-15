@@ -1199,6 +1199,12 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 			bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
 			bool jDominatesI = !iDominatesJ;
 			for (int r = 0; r < sem_repulsors.size(); r++){
+				// check if distance == 0 -> i is an repulsor
+				if (repulsor_distances_new[i][r] == 0){
+					iDominatesJ = false;
+					jDominatesI = true;
+					break;
+				}
 				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
 				jDominatesI = (jDominatesI && repulsor_distances_new[i][r] < repulsor_distances_new[j][r]);
 			}
