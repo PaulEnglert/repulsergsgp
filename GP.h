@@ -776,73 +776,75 @@ void read_config_file(cfg *config){
 		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
 		exit(-1);
 	}
-	int k=0;
 	while(!f.eof()){
-		char str[100]="";
+		char in_str[100]="";
+		char str1[100]="";
 		char str2[100]="";
 		int j=0;
-		f.getline(str,100);
-		if(str[0]!='\0'){
-			while(str[j]!='='){
+		f.getline(in_str,100);
+		string line = string(in_str);
+		clog<<"\t\t"<<in_str<<endl;
+		if(in_str[0]!='\0'){
+			// secure the format
+			line.erase(remove(line.begin(), line.end(), ' '), line.end());
+			line.erase(remove(line.begin(), line.end(), '\t'), line.end());
+			strcpy(in_str, line.c_str());
+			while(in_str[j]!='='){
+				str1[j] = in_str[j];
 				j++;
 			}
 			j++;
 			int i=0;
-			while(str[j]==' '){
-				j++;
-			}
-			while(str[j]!='\0'){
-				str2[i] = str[j];
+			while(in_str[j]!='\0'){
+				str2[i] = in_str[j];
 				j++;
 				i++;
 			}
 		}
-		clog<<"\t\t"<<str<<endl;
-		if(k==0)
+		if(strcmp(str1, "population_size") == 0)
 			config->population_size = atoi(str2);
-		if(k==1)
-			config->max_number_generations=atoi(str2);
-		if(k==2)
+		if(strcmp(str1, "max_number_generations") == 0)
+			config->max_number_generations=atoi(str2); 
+		if(strcmp(str1, "init_type") == 0)
 			config->init_type=atoi(str2);
-		if(k==3)
+		if(strcmp(str1, "p_crossover") == 0)
 			config->p_crossover=atof(str2);
-		if(k==4)
+		if(strcmp(str1, "p_mutation") == 0)
 			config->p_mutation=atof(str2);
-		if(k==5)
+		if(strcmp(str1, "max_depth_creation") == 0)	
 			config->max_depth_creation=atoi(str2);
-		if(k==6)
+		if(strcmp(str1, "tournament_size") == 0)	
 			config->tournament_size=atoi(str2);
-		if(k==7)
+		if(strcmp(str1, "zero_depth") == 0)
 			config->zero_depth=atoi(str2);
-		if(k==8)
+		if(strcmp(str1, "mutation_step") == 0)
 			config->mutation_step=atof(str2);
-		if(k==9){
-			config->num_random_constants=atoi(str2);
+		if(strcmp(str1, "num_random_constants") == 0){
+			config->num_random_constants=atoi(str2);	
 			NUM_CONSTANT_SYMBOLS=config->num_random_constants;
-		}
-		if(k==10)
+        }
+        if(strcmp(str1, "min_random_constant") == 0)
 			config->min_random_constant=atof(str2);
-		if(k==11)
+		if(strcmp(str1, "max_random_constant") == 0)
 			config->max_random_constant=atof(str2);
-		if(k==12)
+		if(strcmp(str1, "minimization_problem") == 0)
 			config->minimization_problem=atoi(str2);
-		if(k==13)
-			config->validation_set_size=atof(str2);
-		if(k==14)
-			config->repulsor_min_age=atoi(str2);
-		if(k==15)
-			config->semantic_repulsor_max_number=atoi(str2);
-		if(k==16)
-			config->validation_elite_size=atoi(str2);
-		if(k==17)
-			config->use_only_best_as_rep_candidate=atoi(str2);
-		if(k==18)
-			config->overfit_by_median=atoi(str2);
-		if(k==19)
-			config->shuffle_validation_split=atoi(str2);
-		if(k==20)
+		if(strcmp(str1, "log_semantics") == 0)
 			config->log_semantics=atoi(str2);
-		k++;
+		if(strcmp(str1, "validation_set_size") == 0)
+			config->validation_set_size=atof(str2);
+		if(strcmp(str1, "repulsor_min_age") == 0)
+			config->repulsor_min_age=atoi(str2);
+		if(strcmp(str1, "semantic_repulsor_max_number") == 0)
+			config->semantic_repulsor_max_number=atoi(str2);
+		if(strcmp(str1, "validation_elite_size") == 0)
+			config->validation_elite_size=atoi(str2);
+		if(strcmp(str1, "use_only_best_as_rep_candidate") == 0)
+			config->use_only_best_as_rep_candidate=atoi(str2);
+		if(strcmp(str1, "overfit_by_median") == 0)
+			config->overfit_by_median=atoi(str2);
+		if(strcmp(str1, "shuffle_validation_split") == 0)
+			config->shuffle_validation_split=atoi(str2);
 	}
 	f.close();
 	if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
