@@ -98,7 +98,7 @@ int main(int argc, const char **argv){
 	ofstream csem;
 	if (config.log_semantics==1){
 		csem.open("results/"+stamp+"-Semantics.txt");
-		csem<<"gen\tidx\tisRep\tsemantics on training data"<<endl;
+		csem<<"gen\tidx\tsemantics on training data"<<endl;
 		log_semantics(&csem, 0);
 	}
 
