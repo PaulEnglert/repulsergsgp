@@ -64,7 +64,7 @@ int main(int argc, const char **argv){
 	 pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
 	 */
 	ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
-	fitness_train<<"gen\tfitness\tpr\t#rep\tdistances to n repulsors"<<endl;
+	fitness_train<<"gen\tidx\tfitness\tpr\t#rep\tdistances to n repulsors"<<endl;
 	/*
 	 pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
 	 */
@@ -90,7 +90,7 @@ int main(int argc, const char **argv){
 	// evaluation of the individuals in the initial population
 	evaluate((population**)&p);
 	// writing the  training fitness of the best individual on the file fitnesstrain.txt
-	fitness_train<<"0\t"<<Myevaluate(p->individuals[p->index_best])<<endl;
+	fitness_train<<"0\t"<<index_best<<"\t"<<Myevaluate(p->individuals[p->index_best])<<endl;
 	// writing the validation fitness of the best individual on the file fitnesstest.txt
 	fitness_val<<"0\t"<<Myevaluate_val(p->individuals[p->index_best])<<endl;
 	// writing the test fitness of the best individual on the file fitnesstest.txt
@@ -153,7 +153,7 @@ int main(int argc, const char **argv){
 		
 		clog<<"Outputting Generation Results"<<endl<<endl;
 		// writing the  training fitness of the best individual on the file fitnesstrain.txt
-		fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<sem_repulsors.size();
+		fitness_train<<num_gen+1<<"\t"<<index_best<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<sem_repulsors.size();
 		for (int l = 0; l < reps_lost; l++){
 			fitness_train<<"\tNA";
 		}
