@@ -711,12 +711,12 @@ void update_tables();
 /*!
  * \fn               void update_repulsors()
  * \brief            function that updates the tables used to store the semantics of the repulsors, as well as recalculates the distances of the individuals to the repulsors
- * \return           void
+ * \return           int: the number of repulsors lost due to size constaint from configuration
  * \date             TODO add date
  * \author           Paul Englert
  * \file             GP.h
  */
-void update_repulsors();
+int update_repulsors();
 
 
 /*!
@@ -1590,27 +1590,29 @@ void update_tables(){
 	sem_test_cases_new.clear();
 }
 
-void update_repulsors(int num_gen){
+int update_repulsors(int num_gen){
 	// check if population is old enough, otherwise discard repulsors
 	if (num_gen < config.repulsor_min_age){
 		clog<<"\tDiscarding "<<sem_repulsors_new.size()<<" repulsors due to population not old enough (min age = "<<config.repulsor_min_age<<")"<<endl;
 		sem_repulsors_new.clear();
-		return;
+		return 0;
 	}
+
 	// add to repulsor table
 	for (int r = 0; r < sem_repulsors_new.size(); r++){
 		sem_repulsors.push_back(sem_repulsors_new[r]);
 	}
 	
 	// enforce size constraint of configuration (-1 means no maximum limit is set)
+	long N = 0;
 	if (config.semantic_repulsor_max_number > -1 && sem_repulsors.size() > config.semantic_repulsor_max_number){
-		long N = sem_repulsors.size()-config.semantic_repulsor_max_number;
+		N = sem_repulsors.size()-config.semantic_repulsor_max_number;
 		vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
 	}
 	
-	// re-evaluate whole population and update repulsor_distances
-	repulsor_distances.clear();
-	if (sem_repulsors.size() > 0){
+	// re-evaluate whole population only if there are new repulsors and update repulsor_distances
+	if (sem_repulsors.size() > 0 &&  sem_repulsors_new.size() > 0){
+		repulsor_distances.clear();
 		for (int i = 0; i < config.population_size; i++){
 			vector <double> rds;
 			double d = 0;
@@ -1626,6 +1628,8 @@ void update_repulsors(int num_gen){
 	}
 	clog<<"\t"<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of being worse than the average validation elite, total: "<<sem_repulsors.size()<<endl;
 	sem_repulsors_new.clear();
+
+	return N;
 }
 
 

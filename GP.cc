@@ -64,7 +64,7 @@ int main(int argc, const char **argv){
 	 pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
 	 */
 	ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
-	fitness_train<<"gen\tfitness\tpr\t#rep"<<endl;
+	fitness_train<<"gen\tfitness\tpr\t#rep\tdistances to n repulsors"<<endl;
 	/*
 	 pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
 	 */
@@ -98,6 +98,8 @@ int main(int argc, const char **argv){
 	// index of the best individual stored in the variable best_index
 	index_best=best_individual();
 	
+	int reps_lost = 0;
+
 	clog<<"Finished Setup Phase"<<endl<<endl;
 	// add fake repulsors for testing
 	// create_fake_repulsors(3);
@@ -135,13 +137,20 @@ int main(int argc, const char **argv){
 		// index of the best individual stored in the variable best_index and overfitting check
 		index_best=best_individual();
 		// update the repulsors table and reevaluate the distances
-		update_repulsors(num_gen);
+		reps_lost = reps_lost + update_repulsors(num_gen);
 		clog<<"Finished Updating of tables and updating repulsors"<<endl<<endl;
 		
 		
 		clog<<"Outputting Generation Results"<<endl<<endl;
 		// writing the  training fitness of the best individual on the file fitnesstrain.txt
-		fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<sem_repulsors.size()<<endl;
+		fitness_train<<num_gen+1<<"\t"<<get<0>(fit_[index_best])<<"\t"<<get<1>(fit_[index_best])<<"\t"<<sem_repulsors.size();
+		for (int l = 0; l < reps_lost; l++){
+			fitness_train<<"\tNA";
+		}
+		for (int r = 0; r < sem_repulsors.size(); r++){
+			fitness_train<<"\t"<<repulsor_distances[index_best][r];
+		}
+		fitness_train<<endl;
 		// writing the  validation fitness of the best individual on the file fitnesstest.txt
 		fitness_val<<num_gen+1<<"\t"<<get<0>(fit_val[index_best])<<endl;
 		// writing the  test fitness of the best individual on the file fitnesstest.txt
