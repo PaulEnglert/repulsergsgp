@@ -41,11 +41,13 @@ int main(int argc, const char **argv){
 	string stamp = strm.str();
 	
 	// redirect cout to GSGP.log
-	ofstream clog("results/"+stamp+"-GSGP.log");
+	ofstream clog("results/"+stamp+"-gsgp.log");
 	auto old_rdbuf = std::clog.rdbuf();
 	std::clog.rdbuf(clog.rdbuf());
 
-	clog<<"Log of standard GSGP run at "<<stamp<<endl<<endl;
+	
+	clog<<"Algorithm: Standard GSGP"<<endl;
+	clog<<"Timestamp: "<<stamp<<endl<<endl;	
 	clog<<"Starting Setup Phase"<<endl;
 	
 
