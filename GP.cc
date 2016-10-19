@@ -40,7 +40,7 @@ int main(int argc, const char **argv){
 	string stamp = strm.str();
 	
 	// redirect cout to GSGP.log
-	ofstream clog("results/"+stamp+"-GSGP.log");
+	ofstream clog("results/"+stamp+"-gsgp.log");
 	auto old_rdbuf = std::clog.rdbuf();
 	std::clog.rdbuf(clog.rdbuf());
 	
@@ -59,7 +59,8 @@ int main(int argc, const char **argv){
 		}
 	}
 
-	clog<<"Protocol of repulsor GSGP run at "<<stamp<<endl<<endl;	
+	clog<<"Algorithm: Repulsor GSGP"<<endl;
+	clog<<"Timestamp: "<<stamp<<endl<<endl;	
 	/*
 	 pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
 	 */
