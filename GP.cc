@@ -51,21 +51,24 @@ int main(int argc, const char **argv){
 	clog<<"Starting Setup Phase"<<endl;
 	
 
+    // name of the file with configuration data
+    char path_config[150]="";
     // name of the file with training instances 
-    char path_in[50]="";
+    char path_in[150]="";
     // name of the file with test instances
-    char path_test[50]="";
+    char path_test[150]="";
    	for (int i=1; i<argc-1; i++) {
         if(strncmp(argv[i],"-train_file",11) == 0) {
             strcat(path_in,argv[++i]);
         }
-        else{
-            if(strncmp(argv[i],"-test_file",10) == 0) {
+        else if(strncmp(argv[i],"-test_file",10) == 0) {
                 strcat(path_test,argv[++i]);
-	      	}        
-       	}
+      	}        
+        else if(strncmp(argv[i],"-config",7) == 0) {
+                strcat(path_config,argv[++i]);
+        } 
    	}
-
+    
     /*
     pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
     */
@@ -78,7 +81,7 @@ int main(int argc, const char **argv){
     // initialization of the seed for the generation of random numbers
 	srand(time (NULL));
 	// reading the parameters of the GP algorithm
-	read_config_file(&config);
+	read_config_file(&config, path_config);
 	// reading training and test files
 	read_input_data(path_in,path_test);
 	// creation of terminal and functional symbols

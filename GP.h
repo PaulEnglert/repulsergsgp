@@ -229,7 +229,7 @@ int index_best;
 * \author          Mauro Castelli
 * \file               GP.h
 */
-void read_config_file(cfg *config);
+void read_config_file(cfg *config, char *file);
 
 
 /*!
@@ -580,9 +580,9 @@ bool better (double f1, double f2);
 void log_semantics (ofstream *csem, int num_gen);
 
 
-void read_config_file(cfg *config){
+void read_config_file(cfg *config, char *file){
 	clog<<"\tReading Configuration:"<<endl;
-	fstream f("configuration.ini", ios::in);
+	fstream f(file, ios::in);
 	if (!f.is_open()) {
     		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
     		exit(-1);
