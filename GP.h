@@ -1202,9 +1202,9 @@ void log_semantics (ofstream *csem, int num_gen){
 	}
 	// log semantics of individuals on training data
 	for (int i = 0; i < semantics.size(); i++){
-		(*csem)<<num_gen<<"\t"<<i;
+		(*csem)<<num_gen<<";"<<i;
 		for (int s = 0; s < semantics[i].size(); s++){
-			(*csem)<<"\t"<<semantics[i][s];
+			(*csem)<<";"<<semantics[i][s];
 		}
 		(*csem)<<endl;
 	}
