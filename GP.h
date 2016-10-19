@@ -282,7 +282,7 @@ int index_best;
  * \author          Mauro Castelli
  * \file               GP.h
  */
-void read_config_file(cfg *config);
+void read_config_file(cfg *config, char *file);
 
 
 /*!
@@ -780,12 +780,12 @@ bool nsga_II_better (fitness_data i1, fitness_data i2);
 void log_semantics (ofstream *csem, int num_gen);
 
 
-void read_config_file(cfg *config){
-	clog<<"\t"<<"Reading configuration data"<<endl;
-	fstream f("configuration.ini", ios::in);
+void read_config_file(cfg *config, char *file){
+	clog<<"\tReading Configuration:"<<endl;
+	fstream f(file, ios::in);
 	if (!f.is_open()) {
-		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
-		exit(-1);
+    		cerr<<"CONFIGURATION FILE NOT FOUND." << endl;
+    		exit(-1);
 	}
 	while(!f.eof()){
 		char in_str[100]="";
