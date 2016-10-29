@@ -260,6 +260,12 @@ vector < vector<double> > sem_repulsors_new;
 vector < vector<double> > repulsor_distances;
 /// array where each element (that is also an array) contains the distances of an individual each repulsor at generation g+1
 vector < vector<double> > repulsor_distances_new;
+// array containing the severity of overfitting of the repulsors (based on the fitness difference to the validation elite)
+vector <double> overfit_severity;
+// array containing the severity of overfitting of the repulsors (based on the fitness difference to the validation elite), for the next generation
+vector <double> overfit_severity_new;
+// array containing a mapping of an id, to an index in the repulsor tables and a marker of the generation, to keep track of changing positions for logging
+vector <tuple<int, int, int>> repulsor_map;
 
 // array containing the semantics of the elite n individuals on the validation set (generation independent list of best individuals)
 vector < vector<double> > sem_val_elite;
@@ -689,15 +695,27 @@ void update_validation_elite(vector <double> semantic_values, double fitness);
 bool is_overfitting(double fit);
 
 /*!
- * \fn               void add_repulsor(vector <double> semantics)
+ * \fn               double get_overfitting_severity(double fit)
+ * \brief             function that returns the difference between the average validation elite fitness and the individuals fitness on the validation data
+ * \param            double fit: fitness of the individual to check
+ * \return           double: margin by which the individual is worse than the average validation elite fitness
+ * \date             TODO add date
+ * \author          Paul Englert
+ * \file               GP.h
+ */
+double get_overfitting_severity(double fit);
+
+/*!
+ * \fn               void add_repulsor(vector <double> semantics, double validation_fitness)
  * \brief             function that adds the given semantics as a repulsor if it isn't already recorded
  * \param            vector <double> semantics: semantics of the repulsor
+ * \param            double validation_fitness: fitness of the repulsor on the validation data
  * \return           void
  * \date             TODO add date
  * \author          Paul Englert
  * \file               GP.h
  */
-void add_repulsor(vector <double> semantics);
+void add_repulsor(vector <double> semantics, double validation_fitness);
 
 /*!
  * \fn                int best_individual()
@@ -1493,7 +1511,7 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
 	// check overfitting, and add the individual to the repulsors
 	int idx = fit_new_val.size()-1;
 	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
-		add_repulsor(sem_train_cases_new[idx]);
+		add_repulsor(sem_train_cases_new[idx], get<0>(fit_new_val[idx]));
 	}
 }
 
@@ -1582,7 +1600,7 @@ int best_individual(){
 	// check if best individual is overfitting or not
 	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
-		add_repulsor(sem_train_cases[best_index]);
+		add_repulsor(sem_train_cases[best_index], get<0>(fit_val[best_index]));
 	}
 	return best_index;
 }
@@ -1594,7 +1612,12 @@ bool is_overfitting(double fit){
 	return (better(val_elite_avg_fit, fit));
 }
 
-void add_repulsor(vector <double> semantics){
+double get_overfitting_severity(double fit){
+	clog<<"Overfit Margin "<<(val_elite_avg_fit-fit)<<endl;
+	return (val_elite_avg_fit-fit);
+}
+
+void add_repulsor(vector <double> semantics, double validation_fitness){
 	bool add = true;
 	// check in repulsor list
 	for (int r = 0; r < sem_repulsors.size(); r++){
@@ -1626,10 +1649,13 @@ void add_repulsor(vector <double> semantics){
 			}
 		}
 	}
-	if (add)
+	if (add){
 		sem_repulsors_new.push_back(semantics);
-	else
+		overfit_severity_new.push_back(get_overfitting_severity(validation_fitness));
+	}
+	else{
 		clog<<"\tRepulsor already recorded"<<endl;
+	}
 }
 
 void update_tables(){
@@ -1668,16 +1694,41 @@ int update_repulsors(int num_gen){
 		return 0;
 	}
 
-	// add to repulsor table
-	for (int r = 0; r < sem_repulsors_new.size(); r++){
-		sem_repulsors.push_back(sem_repulsors_new[r]);
-	}
-	
-	// enforce size constraint of configuration (-1 means no maximum limit is set)
+	// add to repulsor table, if overfitting worse than the best of the repulsers
 	long N = 0;
-	if (config.semantic_repulsor_max_number > -1 && sem_repulsors.size() > config.semantic_repulsor_max_number){
+	if (config.semantic_repulsor_max_number > -1 && sem_repulsors.size() > config.semantic_repulsor_max_number)
 		N = sem_repulsors.size()-config.semantic_repulsor_max_number;
-		vector<decltype(sem_repulsors)::vector<double>>(sem_repulsors.begin()+N, sem_repulsors.end()).swap(sem_repulsors);
+	
+	int idx_best = 0;
+	for (int b = 1; b < overfit_severity.size(); b++){
+		if (overfit_severity[b] > overfit_severity[idx_best])
+			idx_best=b;
+	}
+	bool changed = false;
+	for (int r = 0; r < sem_repulsors_new.size(); r++){
+		if (changed){ // search the least overfitting again
+			for (int b = 1; b < overfit_severity.size(); b++){
+				if (overfit_severity[b] > overfit_severity[idx_best])
+					idx_best=b;
+			}			
+			changed = false;
+		}	
+		// replace if the repulsor is overfitting worse, add if list is not full yet, ignore if none
+		if (sem_repulsors.size() < config.semantic_repulsor_max_number || config.semantic_repulsor_max_number < 0){
+			sem_repulsors.push_back(sem_repulsors_new[r]);
+			overfit_severity.push_back(overfit_severity_new[r]);
+			repulsor_map.push_back(make_tuple(repulsor_map.size(), sem_repulsors.size()-1, num_gen));
+			clog<<"\tAdded repulser"<<endl;
+			changed = true;
+		} else if (overfit_severity[idx_best] > overfit_severity_new[r]){
+			sem_repulsors[idx_best] = sem_repulsors_new[r];
+			overfit_severity[idx_best] = overfit_severity_new[r];
+			repulsor_map.push_back(make_tuple(repulsor_map.size(), idx_best, num_gen));
+			changed = true;
+			clog<<"\tReplaced repulser "<<idx_best<<" with repulser "<<r<<"."<<endl;
+		} else {
+			clog<<"\tIgnored repulser"<<endl;
+		}
 	}
 	
 	// re-evaluate whole population only if there are new repulsors and update repulsor_distances
@@ -1696,8 +1747,9 @@ int update_repulsors(int num_gen){
 			repulsor_distances.push_back(rds);
 		}
 	}
-	clog<<"\t"<<"Added "<<sem_repulsors_new.size()<<" semantic repulsors because of being worse than the average validation elite, total: "<<sem_repulsors.size()<<endl;
+	clog<<"\t"<<"Processsed "<<sem_repulsors_new.size()<<" new semantic repulsors because of being worse than the average validation elite, total: "<<sem_repulsors.size()<<endl;
 	sem_repulsors_new.clear();
+	overfit_severity_new.clear();
 
 	return N;
 }

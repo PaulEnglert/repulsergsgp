@@ -68,15 +68,20 @@ int main(int argc, const char **argv){
 	 pointer to the file fitnesstrain.txt containing the training fitness of the best individual at each generation
 	 */
 	ofstream fitness_train("results/"+stamp+"-fitnesstrain.txt",ios::out);
-	fitness_train<<"gen;idx;fitness;pr;#rep;distances to n repulsors"<<endl;
+	fitness_train<<"gen;idx;fitness;pr;#rep"<<endl;
 	/*
 	 pointer to the file fitnesstest.txt containing the validation fitness of the best individual at each generation
 	 */
 	ofstream fitness_val("results/"+stamp+"-fitnessvalidation.txt",ios::out);
+    /*
+     pointer to the file fitnesstest.txt containing the training fitness of the best individual at each generation
+     */
+    ofstream fitness_test("results/"+stamp+"-fitnesstest.txt",ios::out);
 	/*
-	 pointer to the file fitnesstest.txt containing the training fitness of the best individual at each generation
+	 pointer to the file repulserdistances.txt containing the data on repulsor distances at each generation
 	 */
-	ofstream fitness_test("results/"+stamp+"-fitnesstest.txt",ios::out);
+	ofstream repulsor_log("results/"+stamp+"-repulserdistances.txt",ios::out);
+    repulsor_log<<"gen;id;distance to best individual"<<endl;
 	
 	clog<<"Starting Setup Phase"<<endl;
 	// initialization of the seed for the generation of random numbers
@@ -157,14 +162,19 @@ int main(int argc, const char **argv){
 		
 		clog<<"Outputting Generation Results"<<endl<<endl;
 		// writing the  training fitness of the best individual on the file fitnesstrain.txt
-		fitness_train<<num_gen+1<<";"<<index_best<<";"<<get<0>(fit_[index_best])<<";"<<get<1>(fit_[index_best])<<";"<<sem_repulsors.size();
-		for (int l = 0; l < reps_lost; l++){
-			fitness_train<<";NA";
-		}
-		for (int r = 0; r < sem_repulsors.size(); r++){
-			fitness_train<<";"<<repulsor_distances[index_best][r];
-		}
-		fitness_train<<endl;
+		fitness_train<<num_gen+1<<";"<<index_best<<";"<<get<0>(fit_[index_best])<<";"<<get<1>(fit_[index_best])<<";"<<sem_repulsors.size()<<endl;
+		// writing the repulsor distances to repulserdistances.txt
+        for (int r = 0; r < sem_repulsors.size(); r++){
+            // get last  known id
+            int id = -1;
+            for (int i = repulsor_map.size()-1; i >= 0; i--){
+                if (get<1>(repulsor_map[i]) == r){
+                    id = get<0>(repulsor_map[i]);
+                    break;
+                }
+            }
+            repulsor_log<<""<<num_gen+1<<";"<<id<<";"<<repulsor_distances[index_best][r]<<endl;
+        }
 		// writing the  validation fitness of the best individual on the file fitnesstest.txt
 		fitness_val<<num_gen+1<<";"<<get<0>(fit_val[index_best])<<endl;
 		// writing the  test fitness of the best individual on the file fitnesstest.txt
