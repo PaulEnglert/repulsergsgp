@@ -136,7 +136,7 @@ int main(int argc, const char **argv){
         clog<<"\t\tStarting Update Phase"<<endl;
         
 		// log semantics before anything gets updated for the next generation
-		if (config.log_semantics==1){
+		if (config.log_semantics==1 && (num_gen+1)%50==0){
 			log_semantics(&csem, num_gen+1);
 		}
 
