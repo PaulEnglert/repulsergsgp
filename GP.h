@@ -108,6 +108,8 @@ typedef struct cfg_{
 	int shuffle_validation_split;
 	/// variable that indicates whether to log semantics of individuals and repulsors to an output file
 	int log_semantics;
+	/// variable that indicates whether to use repulors as separate objectives or to aggregate them into one single objective
+	int aggregate_repulsors;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -885,6 +887,8 @@ void read_config_file(cfg *config, char *file){
 			config->overfit_by_median=atoi(str2);
 		if(strcmp(str1, "shuffle_validation_split") == 0)
 			config->shuffle_validation_split=atoi(str2);
+		if(strcmp(str1, "aggregate_repulsors") == 0)
+			config->aggregate_repulsors=atoi(str2);
 	}
 	f.close();
 	if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
@@ -1285,6 +1289,8 @@ void extract_next_front(int cur_front, vector <int>* next_front, population **p,
 bool dominates(int i, int j){
 	// determine domination of i over j, or vice versa based on fitness and all repulsor distances
 	bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
+	double avg_dist_i = 0;
+	double avg_dist_j = 0;
 	bool iIsRepulsor = false;
 	bool jIsRepulsor = false;
 	for (int r = 0; r < sem_repulsors.size(); r++){
@@ -1295,7 +1301,15 @@ bool dominates(int i, int j){
 		if (repulsor_distances_new[j][r] == 0){
 			jIsRepulsor = true;
 		}
+		avg_dist_i += repulsor_distances_new[i][r];
+		avg_dist_j += repulsor_distances_new[j][r];
 		iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+	}
+	// check whether to aggregate the repulsers and reset domination (check if average distance is larger -> then it dominates)
+	avg_dist_i = avg_dist_i/sem_repulsors.size();
+	avg_dist_j = avg_dist_j/sem_repulsors.size();
+	if (config.aggregate_repulsors==1){
+		iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j])) && (avg_dist_i > avg_dist_j);
 	}
 	// force domination if i is repulsor (only if j is not a repulsor either)
 	if (iIsRepulsor){
