@@ -550,6 +550,17 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 void extract_next_front(int cur_front, vector <int>* next_front, population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals);
 
 /*!
+ * \fn                bool dominates(int i, int j)
+ * \brief             function that determines whether individual i dominates individual j
+ * \param            int i: individual i to check
+ * \param            int j: individual j to check as opponent
+ * \return           bool: whether i dominates j
+ * \date             TODO add date
+ * \author          Paul Englert
+ * \file               GP.h
+ */
+bool dominates(int i, int j);
+/*!
  * \fn                void update_terminal_symbols(int i)
  * \brief             function that updates the value of the terminal symbols in a tree.
  * \param          int i: line of the dataset containing the values of the terminal symbols
@@ -1236,32 +1247,9 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 		for(int j=0; j<config.population_size; j++){
 			if (i == j) continue; // no need to compare to oneself
 			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
-			bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
-			bool jDominatesI = !iDominatesJ;
-			bool iIsRepulsor = false;
-			bool jIsRepulsor = false;
-			for (int r = 0; r < sem_repulsors.size(); r++){
-				// check if distance == 0 -> i/j is an repulsor
-				if (repulsor_distances_new[i][r] == 0){
-					iIsRepulsor = true;
-				}
-				if (repulsor_distances_new[j][r] == 0){
-					jIsRepulsor = true;
-				}
-				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
-				jDominatesI = (jDominatesI && repulsor_distances_new[i][r] < repulsor_distances_new[j][r]);
-			}
-			// force domination if i is repulsor (only if j is not a repulsor either)
-			if (iIsRepulsor && !jIsRepulsor){
-				iDominatesJ = false;
-				jDominatesI = true;
-			} else if (!iIsRepulsor && jIsRepulsor){
-				iDominatesJ = true;
-				jDominatesI = false;
-			} else if (iIsRepulsor && jIsRepulsor){
-				iDominatesJ = false;
-				jDominatesI = false;
-			}
+			bool iDominatesJ = dominates(i, j);
+			bool jDominatesI = dominates(j, i);
+
 			// update data structures
 			if (iDominatesJ) // add j to set of dominated solutions of i
 				d_inds.push_back(j);
@@ -1292,6 +1280,30 @@ void extract_next_front(int cur_front, vector <int>* next_front, population **p,
 			}
 		}
 	}
+}
+
+bool dominates(int i, int j){
+	// determine domination of i over j, or vice versa based on fitness and all repulsor distances
+	bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
+	bool iIsRepulsor = false;
+	bool jIsRepulsor = false;
+	for (int r = 0; r < sem_repulsors.size(); r++){
+		// check if distance == 0 -> i/j is an repulsor
+		if (repulsor_distances_new[i][r] == 0){
+			iIsRepulsor = true;
+		}
+		if (repulsor_distances_new[j][r] == 0){
+			jIsRepulsor = true;
+		}
+		iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+	}
+	// force domination if i is repulsor (only if j is not a repulsor either)
+	if (iIsRepulsor){
+		iDominatesJ = false;
+	} else if (!iIsRepulsor && jIsRepulsor){
+		iDominatesJ = true;
+	}
+	return iDominatesJ;
 }
 
 
