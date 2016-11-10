@@ -125,21 +125,46 @@ int main(int argc, const char **argv){
 		clog<<endl<<endl<<"\t GENERATION \t "<<num_gen+1<<endl<<endl;
 		// creation of a new population (without building trees!!)
 		clog<<"Starting Variation Phase"<<endl;
+		int recreateCount = 0;
+		bool best_updated = false;
 		for(int k=0;k<config.population_size;k++){
-			double rand_num=frand();
-			// geometric semantic crossover
-			if(rand_num<config.p_crossover)
-				geometric_semantic_crossover(k);
-			// geometric semantic mutation
-			if(rand_num>=config.p_crossover && rand_num<config.p_crossover+config.p_mutation){
-				reproduction(k);
-				geometric_semantic_mutation(k);
-			}
-			// reproduction
-			if(rand_num>=config.p_crossover+config.p_mutation){
-				reproduction(k);
-			}
+			bool individual_accepted=true;
+			bool first_repetition=true;
+			do{
+				individual_accepted = true;
+				double rand_num=frand();
+				// geometric semantic crossover
+				if(rand_num<config.p_crossover)
+					geometric_semantic_crossover(k);
+				// geometric semantic mutation
+				if(rand_num>=config.p_crossover && rand_num<config.p_crossover+config.p_mutation){
+					reproduction(k);
+					geometric_semantic_mutation(k);
+				}
+				// reproduction
+				if(rand_num>=config.p_crossover+config.p_mutation){
+					reproduction(k);
+				}
+				if (!first_repetition){
+					recreateCount++;
+				}
+				if (config.force_avoid_repulsors==1 && isEqualToAnyRepulsor(sem_train_cases_new.size()-1)){
+					individual_accepted=false;
+					first_repetition=false;
+					// remove k from data tables
+					fit_new.erase(fit_new.begin()+k);
+					fit_new_val.erase(fit_new_val.begin()+k);
+					fit_new_test.erase(fit_new_test.begin()+k);
+					sem_train_cases_new.erase(sem_train_cases_new.begin()+k);
+					sem_val_cases_new.erase(sem_val_cases_new.begin()+k);
+					sem_test_cases_new.erase(sem_test_cases_new.begin()+k);
+					if (sem_repulsors.size() > 0)
+						repulsor_distances_new.erase(repulsor_distances_new.begin()+k);
+				}
+			} while (!individual_accepted);
 		}
+		clog<<"\tRecreated "<<recreateCount<<" individuals."<<endl;
+		calculateMaxDistance();
 		clog<<"Finished Variation Phase"<<endl<<endl;
 		clog<<"Starting Non-Dominated Sorting Phase"<<endl;
 		// update non-domination rank and crowded distance measure

@@ -110,6 +110,10 @@ typedef struct cfg_{
 	int log_semantics;
 	/// variable that indicates whether to use repulors as separate objectives or to aggregate them into one single objective
 	int aggregate_repulsors;
+	/// variable that indicates whether force recreation of individuals, if they are equal to any repulsor
+	int force_avoid_repulsors;
+	/// variable that indicates whether the fraction of distance, below which two individuals are considered equal
+	double equality_delta;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -280,6 +284,8 @@ double val_elite_avg_fit;
 
 /// variable that stores the index of the best individual.
 int index_best;
+/// variable that stores the maximum distance between individuals in the population.
+double population_max_distance;
 
 /*!
  * \fn                 void read_config_file(cfg *config)
@@ -799,6 +805,38 @@ bool better (double f1, double f2);
 bool nsga_II_better (fitness_data i1, fitness_data i2);
 
 /*!
+ * \fn               void calculateMaxDistance ()
+ * \brief            function that calculates the maximum distance in the population.
+ * \return           void
+ * \date             TODO add date
+ * \author           Paul Englert
+ * \file             GP.h
+ */
+void calculateMaxDistance ();
+
+/*!
+ * \fn               bool isEqualToAnyRepulsor (int i)
+ * \brief            function that compares an individuals semantics to all repulsors.
+ * \param            int i: index of the individual to test
+ * \return           bool: true if ind is equal to any repulsor (based on equality_delta)
+ * \date             TODO add date
+ * \author           Paul Englert
+ * \file             GP.h
+ */
+bool isEqualToAnyRepulsor (int i);
+
+/*!
+ * \fn               double calculateSmallestRepulsorDistance (int i)
+ * \brief            function that returns the distance to the closest repulsor.
+ * \param            int i: index of the individual to test
+ * \return           double: distance to closest repulsor
+ * \date             TODO add date
+ * \author           Paul Englert
+ * \file             GP.h
+ */
+double calculateSmallestRepulsorDistance (int i);
+
+/*!
  * \fn               void log_semantics (ofstream *csem, int num_gen)
  * \brief            function that logs all semantics of the current population and the repulsors.
  * \param 			 ofstream csem: the output stream to write the semantics to
@@ -889,6 +927,10 @@ void read_config_file(cfg *config, char *file){
 			config->shuffle_validation_split=atoi(str2);
 		if(strcmp(str1, "aggregate_repulsors") == 0)
 			config->aggregate_repulsors=atoi(str2);
+		if(strcmp(str1, "force_avoid_repulsors") == 0)
+			config->force_avoid_repulsors=atoi(str2);
+		if(strcmp(str1, "equality_delta") == 0)
+			config->equality_delta=atof(str2);
 	}
 	f.close();
 	if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
@@ -1362,7 +1404,13 @@ int tournament_selection(){
 
 void reproduction(int i){
 	int p1 = i;
-	if(i!=index_best){
+	bool allow_variation=true;
+	if (i==index_best){
+		allow_variation=false;
+		if (calculateSmallestRepulsorDistance(i) == 0)// don't use eitism if index_best is repulsor
+			allow_variation=true;
+	}
+	if(allow_variation){
 		p1=tournament_selection();
 	}
 	// train
@@ -1380,7 +1428,13 @@ void reproduction(int i){
 
 
 void geometric_semantic_crossover(int i){
-	if(i!=index_best){
+	bool allow_variation=true;
+	if (i==index_best){
+		allow_variation=false;
+		if (calculateSmallestRepulsorDistance(i) == 0)// don't use eitism if index_best is repulsor
+			allow_variation=true;
+	}
+	if(allow_variation){
 		int p1=tournament_selection();
 		int p2=tournament_selection();
 		
@@ -1444,7 +1498,13 @@ void geometric_semantic_crossover(int i){
 }
 
 void geometric_semantic_mutation(int i){
-	if(i!=index_best){
+	bool allow_variation=true;
+	if (i==index_best){
+		allow_variation=false;
+		if (calculateSmallestRepulsorDistance(i) == 0)// don't use eitism if index_best is repulsor
+			allow_variation=true;
+	}
+	if(allow_variation){
 		node* RT=new node;
 		create_grow_tree((node**)&(RT),0, NULL, config.max_depth_creation);
 		node* RT_2=new node;
@@ -1615,20 +1675,20 @@ void update_validation_elite(vector <double> semantic_values, double fitness){
 
 int best_individual(){
 	fitness_data best=fit_[0];
-	int best_index=0;
+	int best_index1=0;
 	for(int i=0;i<fit_.size();i++){
 		if(nsga_II_better(fit_[i],best)){
 			best=fit_[i];
-			best_index=i;
+			best_index1=i;
 		}
 	}
 	
 	// check if best individual is overfitting or not
-	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index]))){
+	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index1]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
-		add_repulsor(sem_train_cases[best_index], get<0>(fit_val[best_index]));
+		add_repulsor(sem_train_cases[best_index1], get<0>(fit_val[best_index1]));
 	}
-	return best_index;
+	return best_index1;
 }
 
 bool is_overfitting(double fit){
@@ -1875,6 +1935,55 @@ bool nsga_II_better (fitness_data i1, fitness_data i2){
 	} else {
 		return better(get<0>(i1), get<0>(i2));
 	}
+}
+
+void calculateMaxDistance (){
+	// calculate population max distance
+	double maxD = 0;
+	for (int a = 0; a < sem_train_cases_new.size()-1; a++){
+		for (int b = a+1; b < sem_train_cases_new.size(); b++){
+			double d = 0;
+			for (int s = 0; s < nrow; s++){
+				d += (sem_train_cases_new[a][s]-sem_train_cases_new[b][s])*(sem_train_cases_new[a][s]-sem_train_cases_new[b][s]);
+			}
+			d = sqrt(d / nrow);
+			if (d > maxD){
+				maxD = d;
+			}
+		}
+	}
+	population_max_distance = maxD;
+}
+
+bool isEqualToAnyRepulsor (int i){
+	// return true of distance of individual i to any repulsor is less than maximum distance * equality_delta
+	for (int r = 0; r < sem_repulsors.size(); r++){
+		double d = 0;
+		for (int s=0; s < nrow; s++){
+			d += (sem_repulsors[r][s] - sem_train_cases_new[i][s])*(sem_repulsors[r][s] - sem_train_cases_new[i][s]);
+		}
+		d = sqrt(d / nrow);
+		if (d < population_max_distance*config.equality_delta){
+			return true;
+		}
+	}
+	return false;
+}
+
+double calculateSmallestRepulsorDistance (int i){
+	// return the smallest found distance to any repulsor
+	double minD = population_max_distance;
+	for (int r = 0; r < sem_repulsors.size(); r++){
+		double d = 0;
+		for (int s=0; s < nrow; s++){
+			d += (sem_repulsors[r][s] - sem_train_cases_new[i][s])*(sem_repulsors[r][s] - sem_train_cases_new[i][s]);
+		}
+		d = sqrt(d / nrow);
+		if (d < minD){
+			minD = d;
+		}
+	}
+	return minD;
 }
 
 void log_semantics (ofstream *csem, int num_gen){
