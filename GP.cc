@@ -161,7 +161,7 @@ int main(int argc, const char **argv){
 					if (sem_repulsors.size() > 0)
 						repulsor_distances_new.erase(repulsor_distances_new.begin()+k);
 				}
-			} while (!individual_accepted);
+			} while (recreateCount<50000 && !individual_accepted);
 		}
 		clog<<"\tRecreated "<<recreateCount<<" individuals."<<endl;
 		calculateMaxDistance();
