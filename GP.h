@@ -286,6 +286,7 @@ double val_elite_avg_fit;
 int index_best;
 /// variable that stores the maximum distance between individuals in the population.
 double population_max_distance;
+double population_combined_max_distance;
 
 /*!
  * \fn                 void read_config_file(cfg *config)
@@ -1462,8 +1463,7 @@ void geometric_semantic_crossover(int i){
 		}
 		sem_train_cases_new.push_back(val);
 		update_training_fitness(val,1);
-		update_repulsor_distances(val,1);
-		
+
 		// validation
 		for(int j=0;j<nrow_val;j++){
 			double sigmoid_val=1.0/(1+exp(-(sem_RT_val[j])));
@@ -1480,6 +1480,11 @@ void geometric_semantic_crossover(int i){
 		}
 		sem_test_cases_new.push_back(val_test);
 		update_test_fitness(val_test,1);
+		
+		// repulsers
+		vector <double> sems = val;
+		sems.insert(sems.end(), val_val.begin(), val_val.end());
+		update_repulsor_distances(sems,1);
 	}
 	
 	else{
@@ -1534,7 +1539,6 @@ void geometric_semantic_mutation(int i){
 		}
 		
 		update_training_fitness(sem_train_cases_new[i],0);
-		update_repulsor_distances(sem_train_cases_new[i],0);
 		
 		// validation
 		for(int j=0;j<nrow_val;j++){
@@ -1553,6 +1557,11 @@ void geometric_semantic_mutation(int i){
 			sem_test_cases_new[i][j]=sem_test_cases_new[i][j]+config.mutation_step*(sigmoid_test_1-sigmoid_test_2);
 		}
 		update_test_fitness(sem_test_cases_new[i],0);
+
+		// repulsors
+		vector <double> sems = sem_train_cases_new[i];
+		sems.insert(sems.end(), sem_val_cases_new[i].begin(), sem_val_cases_new[i].end());
+		update_repulsor_distances(sems,1);
 	}
 	else{
 		long new_index = sem_train_cases_new.size()-1;
@@ -1597,7 +1606,10 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
 	// check overfitting, and add the individual to the repulsors
 	int idx = fit_new_val.size()-1;
 	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
-		add_repulsor(sem_train_cases_new[idx], get<0>(fit_new_val[idx]));
+		// add_repulsor(sem_train_cases_new[idx], get<0>(fit_new_val[idx]));
+		vector<double> sems = sem_train_cases_new[idx];
+		sems.insert(sems.end(), sem_val_cases_new[idx].begin(), sem_val_cases_new[idx].end());
+		add_repulsor(sems, get<0>(fit_new_val[idx]));
 	}
 }
 
@@ -1622,10 +1634,10 @@ void update_repulsor_distances(vector <double> semantic_values, bool crossover){
 	double d = 0;
 	for (int r=0; r < sem_repulsors.size(); r++){
 		d = 0;
-		for (int v=0; v < semantic_values.size(); v++){
+		for (int v=0; v < sem_repulsors[r].size(); v++){
 			d += (sem_repulsors[r][v] - semantic_values[v])*(sem_repulsors[r][v] - semantic_values[v]);
 		}
-		rds.push_back(sqrt(d));
+		rds.push_back(sqrt(d / sem_repulsors[r].size()));
 	}
 	if(crossover == 1)
 		repulsor_distances_new.push_back(rds);
@@ -1686,7 +1698,10 @@ int best_individual(){
 	// check if best individual is overfitting or not
 	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index1]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
-		add_repulsor(sem_train_cases[best_index1], get<0>(fit_val[best_index1]));
+		vector<double> sems = sem_train_cases[best_index1];
+		sems.insert(sems.end(), sem_val_cases[best_index1].begin(), sem_val_cases[best_index1].end());
+		add_repulsor(sems, get<0>(fit_val[best_index1]));
+		// add_repulsor(sem_train_cases[best_index1], get<0>(fit_val[best_index1]));
 	}
 	return best_index1;
 }
@@ -1822,13 +1837,15 @@ int update_repulsors(int num_gen){
 		repulsor_distances.clear();
 		for (int i = 0; i < config.population_size; i++){
 			vector <double> rds;
+			vector <double> inds_sems = sem_train_cases[i];
+			inds_sems.insert(inds_sems.end(), sem_val_cases[i].begin(), sem_val_cases[i].end());
 			double d = 0;
 			for (int r=0; r < sem_repulsors.size(); r++){
 				d = 0;
-				for (int v=0; v < nrow; v++){
-					d += (sem_repulsors[r][v] - sem_train_cases[i][v])*(sem_repulsors[r][v] - sem_train_cases[i][v]);
+				for (int v=0; v < sem_repulsors[r].size(); v++){
+					d += (sem_repulsors[r][v] - inds_sems[v])*(sem_repulsors[r][v] - inds_sems[v]);
 				}
-				rds.push_back(sqrt(d));
+				rds.push_back(sqrt(d / inds_sems.size()));
 			}
 			repulsor_distances.push_back(rds);
 		}
@@ -1940,19 +1957,29 @@ bool nsga_II_better (fitness_data i1, fitness_data i2){
 void calculateMaxDistance (){
 	// calculate population max distance
 	double maxD = 0;
+	double cMaxD = 0;
 	for (int a = 0; a < sem_train_cases_new.size()-1; a++){
 		for (int b = a+1; b < sem_train_cases_new.size(); b++){
 			double d = 0;
 			for (int s = 0; s < nrow; s++){
 				d += (sem_train_cases_new[a][s]-sem_train_cases_new[b][s])*(sem_train_cases_new[a][s]-sem_train_cases_new[b][s]);
 			}
+			double d_c = d;
 			d = sqrt(d / nrow);
 			if (d > maxD){
 				maxD = d;
 			}
+			// add validation distance to d_c
+			for (int s = 0; s < nrow_val; s++){
+				d_c += (sem_val_cases_new[a][s]-sem_val_cases_new[b][s])*(sem_val_cases_new[a][s]-sem_val_cases_new[b][s]);	
+			}
+			d_c = sqrt(d_c / (nrow+nrow_val));
+			if (d_c > cMaxD)
+				cMaxD = d_c;
 		}
 	}
 	population_max_distance = maxD;
+	population_combined_max_distance = cMaxD;
 }
 
 bool isEqualToAnyRepulsor (int i){
@@ -1962,8 +1989,11 @@ bool isEqualToAnyRepulsor (int i){
 		for (int s=0; s < nrow; s++){
 			d += (sem_repulsors[r][s] - sem_train_cases_new[i][s])*(sem_repulsors[r][s] - sem_train_cases_new[i][s]);
 		}
-		d = sqrt(d / nrow);
-		if (d < population_max_distance*config.equality_delta){
+		for (int s=0; s < nrow_val; s++){
+			d += (sem_repulsors[r][s+nrow] - sem_val_cases_new[i][s])*(sem_repulsors[r][s+nrow] - sem_val_cases_new[i][s]);
+		}
+		d = sqrt(d / (nrow+nrow_val));
+		if (d < population_combined_max_distance*config.equality_delta){
 			return true;
 		}
 	}
@@ -1972,13 +2002,16 @@ bool isEqualToAnyRepulsor (int i){
 
 double calculateSmallestRepulsorDistance (int i){
 	// return the smallest found distance to any repulsor
-	double minD = population_max_distance;
+	double minD = population_combined_max_distance;
 	for (int r = 0; r < sem_repulsors.size(); r++){
 		double d = 0;
 		for (int s=0; s < nrow; s++){
 			d += (sem_repulsors[r][s] - sem_train_cases_new[i][s])*(sem_repulsors[r][s] - sem_train_cases_new[i][s]);
 		}
-		d = sqrt(d / nrow);
+		for (int s=0; s < nrow_val; s++){
+			d += (sem_repulsors[r][s+nrow] - sem_val_cases_new[i][s])*(sem_repulsors[r][s+nrow] - sem_val_cases_new[i][s]);
+		}
+		d = sqrt(d / (nrow+nrow_val));
 		if (d < minD){
 			minD = d;
 		}
