@@ -1,4 +1,4 @@
-/*  Copyright © 2012 Mauro Castelli
+/*  Copyright Â© 2012 Mauro Castelli
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU Affero General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
@@ -100,8 +100,8 @@ typedef struct cfg_{
 	int semantic_repulsor_max_number;
 	/// variable that defines the numbers of individuals to keep as elite on the validation set
 	int validation_elite_size;
-	/// variable that indicates whether each individual will be checked for overfitting or only the best of the population
-	int use_only_best_as_rep_candidate;
+	/// variable that indicates whether and how individuals will be checked for overfitting (always using the n best of the population)
+	int use_best_as_rep_candidate;
 	/// variable that indicates whether overfitting is determined by the median or the average of the validation elites fitness
 	int overfit_by_median;
 	/// variable that indicates whether the split of the training set into validation and training data should be shuffled (different every time)
@@ -920,8 +920,8 @@ void read_config_file(cfg *config, char *file){
 			config->semantic_repulsor_max_number=atoi(str2);
 		if(strcmp(str1, "validation_elite_size") == 0)
 			config->validation_elite_size=atoi(str2);
-		if(strcmp(str1, "use_only_best_as_rep_candidate") == 0)
-			config->use_only_best_as_rep_candidate=atoi(str2);
+		if(strcmp(str1, "use_best_as_rep_candidate") == 0)
+			config->use_best_as_rep_candidate=atoi(str2);
 		if(strcmp(str1, "overfit_by_median") == 0)
 			config->overfit_by_median=atoi(str2);
 		if(strcmp(str1, "shuffle_validation_split") == 0)
@@ -1605,7 +1605,7 @@ void update_validation_fitness(vector <double> semantic_values, bool crossover){
 	
 	// check overfitting, and add the individual to the repulsors
 	int idx = fit_new_val.size()-1;
-	if (config.use_only_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
+	if (config.use_best_as_rep_candidate == 0 && is_overfitting(get<0>(fit_new_val[idx]))){
 		// add_repulsor(sem_train_cases_new[idx], get<0>(fit_new_val[idx]));
 		vector<double> sems = sem_train_cases_new[idx];
 		sems.insert(sems.end(), sem_val_cases_new[idx].begin(), sem_val_cases_new[idx].end());
@@ -1696,12 +1696,38 @@ int best_individual(){
 	}
 	
 	// check if best individual is overfitting or not
-	if (config.use_only_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index1]))){
+	if (config.use_best_as_rep_candidate == 1 && is_overfitting(get<0>(fit_val[best_index1]))){
 		clog<<"\tBest individual has been found to be overfitting."<<endl;
 		vector<double> sems = sem_train_cases[best_index1];
 		sems.insert(sems.end(), sem_val_cases[best_index1].begin(), sem_val_cases[best_index1].end());
 		add_repulsor(sems, get<0>(fit_val[best_index1]));
 		// add_repulsor(sem_train_cases[best_index1], get<0>(fit_val[best_index1]));
+	}
+	else if (config.use_best_as_rep_candidate > 1) {
+		// TODO add sorting and checking of all n individuals
+		clog<<"\tTesting "<<config.use_best_as_rep_candidate<<" for overfitting."<<endl;
+		vector<int> sortedIndices;
+		for (int i = 0; i < fit_.size(); i++){
+			bool added=false;
+			for (int v = 0; v < sortedIndices.size(); v++){
+				if (fit_[sortedIndices[v]] <= fit_[i]) continue;
+				sortedIndices.insert( sortedIndices.begin() + v, i);
+				added=true;
+				break;
+			}
+			if (!added){
+				sortedIndices.push_back(i);
+			}
+		}
+		for (int i = 0; i < config.use_best_as_rep_candidate; i++){
+			// test best n individuals for overfitting
+			if (is_overfitting(get<0>(fit_val[sortedIndices[i]]))){
+				vector<double> sems = sem_train_cases[sortedIndices[i]];
+				sems.insert(sems.end(), sem_val_cases[sortedIndices[i]].begin(), sem_val_cases[sortedIndices[i]].end());
+				add_repulsor(sems, get<0>(fit_val[sortedIndices[i]]));
+			}
+		}
+		clog<<"\tBest "<<sem_repulsors_new.size()<<" found to overfit."<<endl;
 	}
 	return best_index1;
 }
@@ -1714,7 +1740,7 @@ bool is_overfitting(double fit){
 }
 
 double get_overfitting_severity(double fit){
-	clog<<"Overfit Margin "<<(val_elite_avg_fit-fit)<<endl;
+	clog<<"\t\tOverfit Margin "<<(val_elite_avg_fit-fit)<<endl;
 	return (val_elite_avg_fit-fit);
 }
 
