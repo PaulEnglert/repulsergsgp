@@ -123,6 +123,8 @@ int main(int argc, const char **argv){
 		
 		cout<<"Generation "<<num_gen+1<<endl;
 		clog<<endl<<endl<<"\t GENERATION \t "<<num_gen+1<<endl<<endl;
+		// clog<<"\tRerunning NSGA II Sort"<<endl;
+		// nsga_II_sort((population**)&p);
 		// creation of a new population (without building trees!!)
 		clog<<"Starting Variation Phase"<<endl;
 		int recreateCount = 0;
@@ -164,7 +166,9 @@ int main(int argc, const char **argv){
 			} while (recreateCount<50000 && !individual_accepted);
 		}
 		clog<<"\tRecreated "<<recreateCount<<" individuals."<<endl;
-		calculateMaxDistance();
+		if (config.force_avoid_repulsors == 1){
+			calculateMaxDistance();
+		}
 		clog<<"Finished Variation Phase"<<endl<<endl;
 		clog<<"Starting Non-Dominated Sorting Phase"<<endl;
 		// update non-domination rank and crowded distance measure

@@ -116,6 +116,10 @@ typedef struct cfg_{
 	double equality_delta;
 	/// variable that indicates whether to randomly select from the best pareto front during tournament selection
 	int true_pareto_selection;
+	/// variable that indicates whether to exclude fitness from domination determination (as long as repuslers aren't aggregated)
+	int domination_exclude_fitness;
+	/// variable that indicates whether to merge repulsers rather than replace
+	int merge_repulsors;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -189,7 +193,7 @@ public:
 	~node() {delete[] children;}
 };
 
-/// tuple containing a fitness measure, a non-dominated sorting rank and a crowded distance measure
+/// tuple containing a fitness measure and a non-dominated sorting rank
 typedef tuple<double, int> fitness_data;
 /// vector of fitness data
 typedef vector< fitness_data > fitness_list;
@@ -771,6 +775,17 @@ void update_tables();
  */
 int update_repulsors();
 
+/*!
+ * \fn               int merge_repulsors(int count)
+ * \brief            function that merges n repulsers in the currently active repulser table
+ * \param 			 int count: number of repulsers to recursively merge
+ * \return           int: index of the first freed slot in the repusler table
+ * \date             TODO add date
+ * \author           Paul Englert
+ * \file             GP.h
+ */
+int merge_repulsors(int count);
+
 
 /*!
  * \fn               void read_input_data(char *train_file, char *test_file)
@@ -936,6 +951,10 @@ void read_config_file(cfg *config, char *file){
 			config->equality_delta=atof(str2);
 		if(strcmp(str1, "true_pareto_selection") == 0)
 			config->true_pareto_selection=atoi(str2);
+		if(strcmp(str1, "domination_exclude_fitness") == 0)
+			config->domination_exclude_fitness=atoi(str2);
+		if(strcmp(str1, "merge_repulsors") == 0)
+			config->merge_repulsors=atoi(str2);
 	}
 	f.close();
 	if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
@@ -1278,7 +1297,9 @@ void nsga_II_sort(population **p) {
 	perform_fast_non_domination_sort(p, &domination_front, (int**)&domination_counts, &dominated_individuals);
 	
 	int front = 1;
+	int count = 0;
 	while (domination_front.size()!=0){
+		count += domination_front.size();
 		clog<<"\t"<<"Number of Individuals in front "<<front<<": "<<domination_front.size()<<endl;
 		
 		vector <int> next_front;
@@ -1289,6 +1310,7 @@ void nsga_II_sort(population **p) {
 		domination_front = next_front;
 	}
 	delete[] domination_counts;
+	cout<<"Total individuals processed for fronts "<<count<<endl;
 }
 
 void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int **d_counts, vector< vector<int> > *d_individuals){
@@ -1300,7 +1322,9 @@ void perform_fast_non_domination_sort(population **p, vector<int> *d_front, int 
 			// determine domination of i over j, or vice versa based on fitness and all repulsor distances
 			bool iDominatesJ = dominates(i, j);
 			bool jDominatesI = dominates(j, i);
-
+			if (iDominatesJ && jDominatesI){
+				cout<<"WARNING: two individuals can't dominate each other.";
+			}
 			// update data structures
 			if (iDominatesJ) // add j to set of dominated solutions of i
 				d_inds.push_back(j);
@@ -1334,12 +1358,13 @@ void extract_next_front(int cur_front, vector <int>* next_front, population **p,
 }
 
 bool dominates(int i, int j){
-	// determine domination of i over j, or vice versa based on fitness and all repulsor distances
+	// determine domination of i over j
 	bool iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j]));
 	double avg_dist_i = 0;
 	double avg_dist_j = 0;
 	bool iIsRepulsor = false;
 	bool jIsRepulsor = false;
+	// cout<<"Fitness: "<<get<0>(fit_new[i])<<" vs "<<get<0>(fit_new[j])<<""<<endl;
 	for (int r = 0; r < sem_repulsors.size(); r++){
 		// check if distance == 0 -> i/j is an repulsor
 		if (repulsor_distances_new[i][r] == 0){
@@ -1350,12 +1375,24 @@ bool dominates(int i, int j){
 		}
 		avg_dist_i += repulsor_distances_new[i][r];
 		avg_dist_j += repulsor_distances_new[j][r];
-		iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+		if (config.domination_exclude_fitness == 1){
+			if (r == 0){ // reset iDominatesJ (was initialized based on fitness)
+				iDominatesJ = repulsor_distances_new[i][r] > repulsor_distances_new[j][r];
+			} else{
+				iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+			}
+		} else{
+			iDominatesJ = (iDominatesJ && repulsor_distances_new[i][r] > repulsor_distances_new[j][r]);
+		}
 	}
 	// check whether to aggregate the repulsers and reset domination (check if average distance is larger -> then it dominates)
 	avg_dist_i = avg_dist_i/sem_repulsors.size();
 	avg_dist_j = avg_dist_j/sem_repulsors.size();
+	// cout<<i<<";"<<j<<endl;
+	// cout<<get<0>(fit_new[i])<<";"<<get<0>(fit_new[j])<<endl;
+	// cout<<avg_dist_i<<";"<<avg_dist_j<<endl;
 	if (config.aggregate_repulsors==1){
+		// cout<<"Avg. Distance: "<<avg_dist_i<<" vs "<<avg_dist_j<<""<<endl;
 		iDominatesJ = better(get<0>(fit_new[i]), get<0>(fit_new[j])) && (avg_dist_i > avg_dist_j);
 	}
 	// force domination if i is repulsor (only if j is not a repulsor either)
@@ -1363,6 +1400,8 @@ bool dominates(int i, int j){
 		iDominatesJ = false;
 	} else if (!iIsRepulsor && jIsRepulsor){
 		iDominatesJ = true;
+	} else if (iIsRepulsor && jIsRepulsor){
+		iDominatesJ = false;
 	}
 	return iDominatesJ;
 }
@@ -1390,20 +1429,52 @@ void delete_individual(node * el){
 int tournament_selection(){
 	int *index=NULL;
 	index=new int [config.tournament_size];
+	// clog<<"\t[Tournament with "<<sem_repulsors.size()<<" repulsers of ";
 	for(int i=0;i<config.tournament_size;i++){
 		index[i]=int(frand()*(config.population_size-1));
+		// clog<<index[i]<<",";
 	}
-	fitness_data best=fit_[index[0]];
-	int best_index=index[0];
-	for(int j=1;j<config.tournament_size;j++){
-		fitness_data opponent=fit_[index[j]];
-		if (nsga_II_better(opponent, best)){
-			best=opponent;
-			best_index=index[j];
+	// clog<<"]";
+	if (config.true_pareto_selection==0)
+	{
+		fitness_data best=fit_[index[0]];
+		double best_traditional=get<0>(fit_[index[0]]);
+		int best_index=index[0];
+		int best_index_traditional=index[0];
+		for(int j=1;j<config.tournament_size;j++){
+			fitness_data opponent=fit_[index[j]];
+			if (better(get<0>(opponent), get<0>(best))){
+				best_traditional=get<0>(opponent);
+				best_index_traditional=index[j];
+			}
+			if (nsga_II_better(opponent, best) && !isEqualToAnyRepulsor(best_index)){
+				best=opponent;
+				best_index=index[j];
+			}
 		}
+		if (best_index_traditional != best_index)
+			clog<<"[TOURNAMENT] Idx NSGA II: "<<best_index<<" vs. Idx Traditional: "<<best_index_traditional<<" | Ranks "<<get<1>(best)<<" vs. "<<get<1>(fit_[best_index_traditional])<<endl;
+		delete[] index;
+		return best_index;
+	} else {
+		// get best rank and apply frand() > 0.5
+		vector<int> best_indices;
+		int best_rank=get<1>(fit_[index[0]]);
+		best_indices.push_back(0);
+		for (int j = 1; j < config.tournament_size; j++){
+			if (get<1>(fit_[index[j]]) < best_rank){
+				// clear best indices and update best rank
+				best_indices.clear();
+				best_rank=get<1>(fit_[index[j]]);
+				best_indices.push_back(j);
+			} else if (get<1>(fit_[index[j]]) == best_rank){
+				best_indices.push_back(j);
+			} else {/*nothing*/}
+		}
+		int idx = best_indices[floor(frand()*best_indices.size())];
+		delete[] index;
+		return idx;
 	}
-	delete[] index;
-	return best_index;
 }
 
 
@@ -1697,7 +1768,7 @@ int best_individual(){
 		// 	best=fit_[i];
 		// 	best_index1=i;
 		// }
-		if(better(fit_[i],best)){
+		if(better(get<0>(fit_[i]),get<0>(best))){
 			best=fit_[i];
 			best_index1=i;
 		}
@@ -1856,11 +1927,21 @@ int update_repulsors(int num_gen){
 			clog<<"\tAdded repulser"<<endl;
 			changed = true;
 		} else if (overfit_severity[idx_best] > overfit_severity_new[r]){
-			sem_repulsors[idx_best] = sem_repulsors_new[r];
-			overfit_severity[idx_best] = overfit_severity_new[r];
-			repulsor_map.push_back(make_tuple(repulsor_map.size(), idx_best, num_gen));
-			changed = true;
-			clog<<"\tReplaced repulser "<<idx_best<<" with repulser "<<r<<"."<<endl;
+			// replace repulser with new one
+			if (config.merge_repulsors == 0){
+				sem_repulsors[idx_best] = sem_repulsors_new[r];
+				overfit_severity[idx_best] = overfit_severity_new[r];
+				repulsor_map.push_back(make_tuple(repulsor_map.size(), idx_best, num_gen));
+				changed = true;
+				clog<<"\tReplaced repulser "<<idx_best<<" with repulser "<<r<<"."<<endl;
+			} else {
+				// merge two most similar repulsers and add the other one
+				int freed_index = merge_repulsors(2);
+				sem_repulsors[freed_index] = sem_repulsors_new[r];
+				overfit_severity[freed_index] = overfit_severity_new[r];
+				repulsor_map.push_back(make_tuple(repulsor_map.size(), freed_index, num_gen));
+				changed = true;
+			}
 		} else {
 			clog<<"\tIgnored repulser"<<endl;
 		}
@@ -1889,6 +1970,48 @@ int update_repulsors(int num_gen){
 	overfit_severity_new.clear();
 
 	return N;
+}
+
+int merge_repulsors(int count){
+	if (count < 2 || sem_repulsors.size() < 2)
+		return -1;
+
+	int idx1 = -1;
+	int idx2 = -1;
+	int distance = -1;
+	for (int r1 = 0; r1 < sem_repulsors.size()-1; r1++){
+		for (int r2 = r1+1; r2 < sem_repulsors.size(); r2++){
+			// get distance between r1 and r2
+			double dist = 0;
+			for (int s = 0; s < sem_repulsors[r1].size(); s++){
+				dist += (sem_repulsors[r1][s] - sem_repulsors[r2][s])*(sem_repulsors[r1][s] - sem_repulsors[r2][s]);
+			}
+			dist = sqrt(dist / sem_repulsors[r1].size());
+			if (distance < 0){ // first round
+				distance = dist;
+				idx1 = r1;
+				idx2 = r2;
+			} else if (distance > dist){ // current two are closer than so far closest found
+				distance = dist;
+				idx1 = r1;
+				idx2 = r2;
+			}
+		}
+	}
+	// get means
+	vector<double> avg_sems;
+	for (int s = 0; s < sem_repulsors[idx1].size(); s++){
+		avg_sems.push_back((sem_repulsors[idx1][s] + sem_repulsors[idx2][s]) / 2);
+	}
+	double avg_severity = (overfit_severity[idx1] + overfit_severity[idx2]) / 2;
+	// replace data
+	sem_repulsors[idx1] = avg_sems;
+	overfit_severity[idx1] = avg_severity;
+	clog<<"\tMerged repulser "<<idx1<<" with repulser "<<idx2<<"."<<endl;
+	// recurse
+	merge_repulsors(count-1);
+	// return first freed index
+	return idx2;
 }
 
 
@@ -1977,24 +2100,12 @@ bool better (double f1, double f2){
 
 bool nsga_II_better (fitness_data i1, fitness_data i2){
 	if (sem_repulsors.size()>0){
-		// no true pareto selection
-		if (config.true_pareto_selection == 0){
-			if (get<1>(i1) < get<1>(i2)){
-				return true;
-			} else if (get<1>(i1) == get<1>(i2)){
-				return better(get<0>(i1), get<0>(i2));
-			}
-			return false;
-		} else {
-			// use true pareto selection
-			if (get<1>(i1) < get<1>(i2)){
-				return true;
-			} else if (get<1>(i1) == get<1>(i2)){
-				// randomly decide here
-				return (frand() < 0.5);
-			}
-			return false;
+		if (get<1>(i1) < get<1>(i2)){
+			return true;
+		} else if (get<1>(i1) == get<1>(i2)){
+			return better(get<0>(i1), get<0>(i2));
 		}
+		return false;
 	} else {
 		return better(get<0>(i1), get<0>(i2));
 	}
