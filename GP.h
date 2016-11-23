@@ -114,6 +114,8 @@ typedef struct cfg_{
 	int force_avoid_repulsors;
 	/// variable that indicates whether the fraction of distance, below which two individuals are considered equal
 	double equality_delta;
+	/// variable that indicates whether to randomly select from the best pareto front during tournament selection
+	int true_pareto_selection;
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -932,6 +934,8 @@ void read_config_file(cfg *config, char *file){
 			config->force_avoid_repulsors=atoi(str2);
 		if(strcmp(str1, "equality_delta") == 0)
 			config->equality_delta=atof(str2);
+		if(strcmp(str1, "true_pareto_selection") == 0)
+			config->true_pareto_selection=atoi(str2);
 	}
 	f.close();
 	if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
@@ -1689,7 +1693,11 @@ int best_individual(){
 	fitness_data best=fit_[0];
 	int best_index1=0;
 	for(int i=0;i<fit_.size();i++){
-		if(nsga_II_better(fit_[i],best)){
+		// if(nsga_II_better(fit_[i],best)){
+		// 	best=fit_[i];
+		// 	best_index1=i;
+		// }
+		if(better(fit_[i],best)){
 			best=fit_[i];
 			best_index1=i;
 		}
@@ -1969,12 +1977,24 @@ bool better (double f1, double f2){
 
 bool nsga_II_better (fitness_data i1, fitness_data i2){
 	if (sem_repulsors.size()>0){
-		if (get<1>(i1) < get<1>(i2)){
-			return true;
-		} else if (get<1>(i1) == get<1>(i2)){
-			return better(get<0>(i1), get<0>(i2));
+		// no true pareto selection
+		if (config.true_pareto_selection == 0){
+			if (get<1>(i1) < get<1>(i2)){
+				return true;
+			} else if (get<1>(i1) == get<1>(i2)){
+				return better(get<0>(i1), get<0>(i2));
+			}
+			return false;
+		} else {
+			// use true pareto selection
+			if (get<1>(i1) < get<1>(i2)){
+				return true;
+			} else if (get<1>(i1) == get<1>(i2)){
+				// randomly decide here
+				return (frand() < 0.5);
+			}
+			return false;
 		}
-		return false;
 	} else {
 		return better(get<0>(i1), get<0>(i2));
 	}
