@@ -499,6 +499,18 @@ void geometric_semantic_crossover(int i);
 */
 void geometric_semantic_mutation(int i);
 
+/*!
+* \fn                void mutation_linear_combination(double t, double mb)
+* \brief             function that calculates the linear combination for the mutation
+* \param            double t: value of an individuals semantic
+* \param            double mb: mutation base which will be added to the individuals semantic value
+* \return           double
+* \date             01/18/2017
+* \author          Paul Englert
+* \file             GP.h
+*/
+double mutation_linear_combination(double t, double mb);
+
 
 /*!
 * \fn                void update_training_fitness(vector <double> semantic_values, bool crossover)
@@ -665,13 +677,13 @@ void read_config_file(cfg *config, char *file){
         cout<<"ERROR: CROSSOVER RATE AND MUTATION RATE MUST BE GREATER THAN (OR EQUAL TO) 0 AND THEIR SUM SMALLER THAN (OR EQUAL TO) 1.";
         exit(-1);
     }
-    static const vector<string> validValues {"pow", "log", "exp"};
+    static const vector<string> validValues {"pow", "log", "exp", "non"};
     if (std::find(validValues.begin(), validValues.end(), string(config->m_func_t)) == validValues.end()  ){
-	    cout<<"ERROR: VALUE OF m_func_1 ("<<config->m_func_t<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log}.";
+	    cout<<"ERROR: VALUE OF m_func_1 ("<<config->m_func_t<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log, none} (none = no transformation).";
         exit(-1);
     }
     if (std::find(validValues.begin(), validValues.end(), string(config->m_func_mb)) == validValues.end()  ){
-	    cout<<"ERROR: VALUE OF m_func_2 ("<<config->m_func_mb<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log}.";
+	    cout<<"ERROR: VALUE OF m_func_2 ("<<config->m_func_mb<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log, none} (none = no transformation).";
         exit(-1);
     }
 }
@@ -1082,7 +1094,7 @@ void geometric_semantic_mutation(int i){
         for(int j=0;j<nrow;j++){
             double sigmoid_1=1.0/(1+exp(-(sem_RT1[j])));
             double sigmoid_2=1.0/(1+exp(-(sem_RT2[j])));
-            sem_train_cases_new[i][j]=sem_train_cases_new[i][j]+config.mutation_step*(sigmoid_1-sigmoid_2);
+            sem_train_cases_new[i][j]=mutation_linear_combination(sem_train_cases_new[i][j], config.mutation_step*(sigmoid_1-sigmoid_2));
         }
 
         update_training_fitness(sem_train_cases_new[i],0);
@@ -1090,7 +1102,7 @@ void geometric_semantic_mutation(int i){
         for(int j=0;j<nrow_test;j++){
     	    double sigmoid_test_1=1.0/(1+exp(-(sem_RT1_test[j])));
     	    double sigmoid_test_2=1.0/(1+exp(-(sem_RT2_test[j])));
-            sem_test_cases_new[i][j]=sem_test_cases_new[i][j]+config.mutation_step*(sigmoid_test_1-sigmoid_test_2);
+            sem_test_cases_new[i][j]=mutation_linear_combination(sem_test_cases_new[i][j], config.mutation_step*(sigmoid_test_1-sigmoid_test_2));
         }
         update_test_fitness(sem_test_cases_new[i],0);
     }
@@ -1100,6 +1112,44 @@ void geometric_semantic_mutation(int i){
         sem_test_cases_new.push_back(sem_test_cases[i]);
         fit_new_test.push_back(fit_test[i]);
     }
+}
+
+double mutation_linear_combination(double t, double mb){
+	if (config->deg == 0){ // don't do anything
+		return t+mb;
+	}
+	double result = ( frand() * 2 ) - 1; // rand -1 < x < 1
+	for (int c = 0; c < config->deg; c++){
+		double a = ( frand() * 2 ) - 1; 
+		double b = ( frand() * 2 ) - 1;
+		double t_n = t;
+		if (strcmp(config->m_func_t, "non") == 0){ // only multiply with random constant
+			result += a*t_n;
+		}
+		if (strcmp(config->m_func_t, "pow") == 0){ // polynomal
+			result += a*pow(t_n, c+1);
+		}
+		if (strcmp(config->m_func_t, "exp") == 0){ // exponential
+			result += a*exp(t_n);
+		}
+		if (strcmp(config->m_func_t, "log") == 0){ // logarithmic
+			result += a*log(t_n);
+		}
+		double mb_n = mb;
+		if (strcmp(config->m_func_mb, "non") == 0){
+			result += b*t_mb;
+		}
+		if (strcmp(config->m_func_mb, "pow") == 0){
+			result += b*pow(t_mb, c+1);
+		}
+		if (strcmp(config->m_func_mb, "exp") == 0){
+			result += b*exp(t_mb);
+		}
+		if (strcmp(config->m_func_mb, "log") == 0){
+			result += b*log(t_mb);
+		}
+	}
+	return result;
 }
 
 
