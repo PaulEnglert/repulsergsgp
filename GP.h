@@ -90,6 +90,11 @@ typedef struct cfg_{
     int minimization_problem;
 /// variable that indicates wether the semantics should be written to a log file
     int log_semantics;
+
+/// mutation variation configurations
+    char m_func_t[4];	// type of function 1 of the mutation
+    char m_func_mb[4];	// type of function 2 of the mutation
+    int m_deg;			// degree of the linear combination
 }cfg;
 
 /// struct variable containing the values of the parameters specified in the configuration.ini file
@@ -641,11 +646,32 @@ void read_config_file(cfg *config, char *file){
 		if(strcmp(str1, "minimization_problem") == 0)
 			config->minimization_problem=atoi(str2);
 		if(strcmp(str1, "log_semantics") == 0)
-			config->log_semantics=atoi(str2);       
+			config->log_semantics=atoi(str2);
+		if(strcmp(str1, "m_func_1") == 0){
+			for (int i = 0; i < 3; i++)
+				config->m_func_t[i] = str2[i];
+			config->m_func_t[3] = '\0';
+		}
+		if(strcmp(str1, "m_func_2") == 0){
+			for (int i = 0; i < 3; i++)
+				config->m_func_mb[i] = str2[i];
+			config->m_func_mb[3] = '\0';
+		}
+		if(strcmp(str1, "m_deg") == 0)
+			config->m_deg=atoi(str2);
 	}	
     f.close();
     if(config->p_crossover<0 || config->p_mutation<0 || config->p_crossover+config->p_mutation>1){
         cout<<"ERROR: CROSSOVER RATE AND MUTATION RATE MUST BE GREATER THAN (OR EQUAL TO) 0 AND THEIR SUM SMALLER THAN (OR EQUAL TO) 1.";
+        exit(-1);
+    }
+    static const vector<string> validValues {"pow", "log", "exp"};
+    if (std::find(validValues.begin(), validValues.end(), string(config->m_func_t)) == validValues.end()  ){
+	    cout<<"ERROR: VALUE OF m_func_1 ("<<config->m_func_t<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log}.";
+        exit(-1);
+    }
+    if (std::find(validValues.begin(), validValues.end(), string(config->m_func_mb)) == validValues.end()  ){
+	    cout<<"ERROR: VALUE OF m_func_2 ("<<config->m_func_mb<<") NOT KNOWN - PLEASE CHOOSE FROM {pow, exp, log}.";
         exit(-1);
     }
 }

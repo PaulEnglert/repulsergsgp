@@ -46,7 +46,7 @@ int main(int argc, const char **argv){
 	std::clog.rdbuf(clog.rdbuf());
 
 	
-	clog<<"Algorithm: Standard GSGP"<<endl;
+	clog<<"Algorithm: Mutation Variation GSGP"<<endl;
 	clog<<"Timestamp: "<<stamp<<endl<<endl;	
 	clog<<"Starting Setup Phase"<<endl;
 	
