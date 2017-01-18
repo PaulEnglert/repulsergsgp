@@ -1115,39 +1115,51 @@ void geometric_semantic_mutation(int i){
 }
 
 double mutation_linear_combination(double t, double mb){
-	if (config->deg == 0){ // don't do anything
+	if (config.m_deg == 0){ // don't do anything
 		return t+mb;
 	}
 	double result = ( frand() * 2 ) - 1; // rand -1 < x < 1
-	for (int c = 0; c < config->deg; c++){
+	for (int c = 0; c < config.m_deg; c++){
 		double a = ( frand() * 2 ) - 1; 
 		double b = ( frand() * 2 ) - 1;
 		double t_n = t;
-		if (strcmp(config->m_func_t, "non") == 0){ // only multiply with random constant
+		// cout<<"Applying ";
+		if (strcmp(config.m_func_t, "non") == 0){ // only multiply with random constant
+			// cout<<"non";
 			result += a*t_n;
 		}
-		if (strcmp(config->m_func_t, "pow") == 0){ // polynomal
+		if (strcmp(config.m_func_t, "pow") == 0){ // polynomal
+			// cout<<"pow"<<c+1;
 			result += a*pow(t_n, c+1);
 		}
-		if (strcmp(config->m_func_t, "exp") == 0){ // exponential
+		if (strcmp(config.m_func_t, "exp") == 0){ // exponential
+			// cout<<"exp";
 			result += a*exp(t_n);
 		}
-		if (strcmp(config->m_func_t, "log") == 0){ // logarithmic
+		if (strcmp(config.m_func_t, "log") == 0){ // logarithmic
+			// cout<<"log";
 			result += a*log(t_n);
 		}
+		// cout<<" to "<<a<<"*"<<t_n<<" ";
 		double mb_n = mb;
-		if (strcmp(config->m_func_mb, "non") == 0){
-			result += b*t_mb;
+		// cout<<"Applying ";
+		if (strcmp(config.m_func_mb, "non") == 0){
+			// cout<<"non";
+			result += b*mb_n;
 		}
-		if (strcmp(config->m_func_mb, "pow") == 0){
-			result += b*pow(t_mb, c+1);
+		if (strcmp(config.m_func_mb, "pow") == 0){
+			// cout<<"pow"<<c+1;
+			result += b*pow(mb_n, c+1);
 		}
-		if (strcmp(config->m_func_mb, "exp") == 0){
-			result += b*exp(t_mb);
+		if (strcmp(config.m_func_mb, "exp") == 0){
+			// cout<<"exp";
+			result += b*exp(mb_n);
 		}
-		if (strcmp(config->m_func_mb, "log") == 0){
-			result += b*log(t_mb);
+		if (strcmp(config.m_func_mb, "log") == 0){
+			// cout<<"log";
+			result += b*log(mb_n);
 		}
+		// cout<<" to "<<b<<"*"<<mb_n<<"\n";
 	}
 	return result;
 }
